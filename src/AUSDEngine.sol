@@ -101,7 +101,7 @@ contract AUSDEngine {
     }
 
     function burnAUSD(uint256 _amount) public moreThanZero(_amount) {
-
+        _burnAUSD(msg.sender, msg.sender, _amount);
     }
 
     function liquidate(address who, uint256 _amount) public moreThanZero(_amount) {}
@@ -113,6 +113,12 @@ contract AUSDEngine {
 
         aUSDDebt = s_totalDept[user];
         totalUSDCollateral = getTotalCollateralInUSD(user);
+    }
+
+    function _burnAUSD(address onBehalfOf, address aUSDFrom, uint256 _amount) private  {
+        s_totalDept[onBehalfOf] -= _amount;
+
+        s_ausd.burn(aUSDFrom, _amount);
     }
 
     function _getHealthFactor(uint256 totalUSDCollateral, uint256 aUSDDebt) private pure returns(uint256 healthFactor) {
