@@ -4,12 +4,18 @@ pragma solidity ^0.8.30;
 
 import {AnchorUSD} from "./AnchorUSD.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract AUSDEngine {
+    using SafeERC20 for IERC20;
+
     error AUSDEngine__NotOwner();
     error AUSDEngine__AUSDAlreadyDefined();
     error AUSDEngine__NotZeroAddress();
     error AUSDEngine__InvalidPrice();
+    error AUSDEngine__TokenNotAllowed();
+    error AUSDEngine__MustBeMoreThanZero();
 
     uint256 private constant PRICE_ADITIONAL_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
@@ -19,15 +25,17 @@ contract AUSDEngine {
     mapping(address user => mapping(address token => uint256 collateral)) private s_collateralDeposited;
     mapping(address user => uint256 debt) private s_totalDept;
     mapping(address token => address priceFeed) private s_priceFeeds;
-    address[] private tokensAllowed;
+    address[] private s_tokensAllowed;
 
     constructor(address weth, address wbtc, address wethPriceFeed, address wbtcPriceFeed) {
         i_owner = msg.sender;
-        tokensAllowed.push(weth);
-        tokensAllowed.push(wbtc);
+        s_tokensAllowed.push(weth);
+        s_tokensAllowed.push(wbtc);
         s_priceFeeds[weth] = wethPriceFeed;
         s_priceFeeds[wbtc] = wbtcPriceFeed;
     }
+
+    event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
 
     modifier onlyOwner() {
         if(msg.sender != i_owner) {
@@ -36,7 +44,30 @@ contract AUSDEngine {
         _;
     }
 
-    function depositCollateral(address token, uint256 _amout) public {}
+    modifier onlyAllowedTokens(address token) {
+        if(s_priceFeeds[token] == address(0)) {
+            revert AUSDEngine__TokenNotAllowed();
+        }
+        _;
+    }
+
+    modifier moreThanZero(uint256 amount) {
+        if(amount == 0) {
+            revert AUSDEngine__MustBeMoreThanZero();
+        }
+        _;
+    }
+
+    function depositCollateral(address token, uint256 _amount) public onlyAllowedTokens(token) moreThanZero(_amount) {
+        if(token == address(0)) {
+            revert AUSDEngine__NotZeroAddress();
+        }
+
+        s_collateralDeposited[msg.sender][token] += _amount;
+        emit CollateralDeposited(msg.sender, token, _amount);
+
+        IERC20(token).safeTransferFrom(msg.sender, address(this), _amount);
+    }
 
     function redeemCollateral(address token, uint256 _amout) public {}
 
@@ -44,7 +75,10 @@ contract AUSDEngine {
 
     function mintAUSD(uint256 _amout) public {}
 
-    function depositCollateralAndMintAUSD(address token, uint256 collateralAmount, uint256 aUSDAmount) public {}
+    function depositCollateralAndMintAUSD(address token, uint256 collateralAmount, uint256 aUSDAmount) public {
+        depositCollateral(token, collateralAmount);
+        mintAUSD(aUSDAmount);
+    }
 
     function getAccountInformation(address user) public view returns(uint256 totalUsdCollateral, uint256 aUSDDebt) {
         if(user == address(0)) {
@@ -60,7 +94,7 @@ contract AUSDEngine {
             revert AUSDEngine__NotZeroAddress();
         }
 
-        address[] memory tokens = tokensAllowed;
+        address[] memory tokens = s_tokensAllowed;
         for(uint256 i = 0; i < tokens.length; i++) {
             totalAmount += _getCollateralInUSD(tokens[i], user);
         }
