@@ -89,20 +89,22 @@ contract AUSDEngine {
         IERC20(token).safeTransfer(msg.sender, _amount);
     }
 
-    function redeemCollateralForAUSD(address token, uint256 _amount) public {
+    function redeemCollateralForAUSD(address token, uint256 _collateralAmount, uint256 aUSDToBurn) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(aUSDToBurn) {
         
     }
 
     function mintAUSD(uint256 _amout) public {}
 
-    function depositCollateralAndMintAUSD(address token, uint256 collateralAmount, uint256 aUSDAmount) public {
-        depositCollateral(token, collateralAmount);
-        mintAUSD(aUSDAmount);
+    function depositCollateralAndMintAUSD(address token, uint256 _collateralAmount, uint256 _aUSDAmount) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(_aUSDAmount) {
+        depositCollateral(token, _collateralAmount);
+        mintAUSD(_aUSDAmount);
     }
 
     function burnAUSD(uint256 _amount) public moreThanZero(_amount) {
 
     }
+
+    function liquidate(address who, uint256 _amount) public moreThanZero(_amount) {}
 
     function getAccountInformation(address user) public view returns(uint256 totalUSDCollateral, uint256 aUSDDebt) {
         if(user == address(0)) {
