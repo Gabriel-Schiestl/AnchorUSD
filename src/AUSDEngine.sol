@@ -91,7 +91,8 @@ contract AUSDEngine {
     }
 
     function redeemCollateralForAUSD(address token, uint256 _collateralAmount, uint256 aUSDToBurn) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(aUSDToBurn) {
-        
+        _burnAUSD(msg.sender, msg.sender, aUSDToBurn);
+        redeemCollateral(token, _collateralAmount);
     }
 
     function mintAUSD(uint256 _amount) public moreThanZero(_amount) {
