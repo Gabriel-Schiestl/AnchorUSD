@@ -129,7 +129,7 @@ contract AUSDEngine {
     }
 
     function _getHealthFactor(uint256 totalUSDCollateral, uint256 aUSDDebt) private pure returns(uint256 healthFactor) {
-        
+        if(aUSDDebt == 0) return type(uint256).max;
 
         uint256 collateralAdjusted = (totalUSDCollateral * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
 
