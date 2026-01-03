@@ -42,6 +42,7 @@ contract AUSDEngine {
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(address indexed user, address indexed token, uint256 indexed amount);
+    event AUSDMinted(address indexed user, uint256 indexed amount);
 
     modifier onlyOwner() {
         if(msg.sender != i_owner) {
@@ -93,7 +94,13 @@ contract AUSDEngine {
         
     }
 
-    function mintAUSD(uint256 _amout) public {}
+    function mintAUSD(uint256 _amount) public moreThanZero(_amount) {
+        s_totalDept[msg.sender] += _amount;
+        emit AUSDMinted(msg.sender, _amount);
+
+        _revertIfHealthFactorBroken(msg.sender);
+        s_ausd.mint(msg.sender, _amount);
+    }
 
     function depositCollateralAndMintAUSD(address token, uint256 _collateralAmount, uint256 _aUSDAmount) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(_aUSDAmount) {
         depositCollateral(token, _collateralAmount);
