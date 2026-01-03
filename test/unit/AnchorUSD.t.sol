@@ -7,7 +7,7 @@ import {AnchorUSD} from "../../src/AnchorUSD.sol";
 import {DeployAUSD} from "../../script/DeployAUSD.s.sol";
 
 contract AnchorUSDTest is Test {
-    AnchorUsd aUSD;
+    AnchorUSD aUSD;
     DeployAUSD deployer;
 
     function setUp() external {

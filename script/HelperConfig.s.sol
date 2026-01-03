@@ -12,20 +12,20 @@ contract HelperConfig is Script {
 
     NetworkConfig activeConfig;
 
-    function getSepoliaConfig() internal {
+    function getSepoliaConfig() internal returns(NetworkConfig memory) {
 
     }
 
-    function getAnvilConfig() internal {
+    function getAnvilConfig() internal returns(NetworkConfig memory) {
 
     }
 
-    function getActiveConfig() external returns(NetworkConfig) {
+    function getActiveConfig() external returns(NetworkConfig memory) {
         if(activeConfig.ethUsdPriceFeed != address(0)) {
             return activeConfig;
         }
 
-        if(block.chainId == 11155111) {
+        if(block.chainid == 11155111) {
             activeConfig = getSepoliaConfig();
         } else {
             activeConfig = getAnvilConfig();
