@@ -8,8 +8,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract AUSDEngine {
-    using SafeERC20 for IERC20;
 
+    //Errors
     error AUSDEngine__NotOwner();
     error AUSDEngine__AUSDAlreadyDefined();
     error AUSDEngine__NotZeroAddress();
@@ -20,7 +20,14 @@ contract AUSDEngine {
     error AUSDEngine__HealthFactorBroken();
     error AUSDEngine__HealthFactorOk();
     error AUSDEngine__HealthFactorNotImproved();
+    error AUSDEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
+    
+    //Types
+    using SafeERC20 for IERC20;
 
+    //State Variables
+    AnchorUSD private s_ausd;
+    
     uint256 private constant PRICE_ADITIONAL_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
     uint256 private constant LIQUIDATION_THRESHOLD = 50;
@@ -28,25 +35,18 @@ contract AUSDEngine {
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
     uint256 private constant LIQUIDATION_BONUS = 10;
 
-    AnchorUSD private s_ausd;
     address private immutable i_owner;
     mapping(address user => mapping(address token => uint256 collateral)) private s_collateralDeposited;
     mapping(address user => uint256 debt) private s_totalDept;
     mapping(address token => address priceFeed) private s_priceFeeds;
     address[] private s_tokensAllowed;
 
-    constructor(address weth, address wbtc, address wethPriceFeed, address wbtcPriceFeed) {
-        i_owner = msg.sender;
-        s_tokensAllowed.push(weth);
-        s_tokensAllowed.push(wbtc);
-        s_priceFeeds[weth] = wethPriceFeed;
-        s_priceFeeds[wbtc] = wbtcPriceFeed;
-    }
-
+    //Events
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(address indexed redeemedFrom, address indexed redeemedTo, address token, uint256 amount);
     event AUSDMinted(address indexed user, uint256 indexed amount);
 
+    //Modifiers
     modifier onlyOwner() {
         if(msg.sender != i_owner) {
             revert AUSDEngine__NotOwner();
@@ -68,11 +68,31 @@ contract AUSDEngine {
         _;
     }
 
+    //Functions
+    constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses) {
+        i_owner = msg.sender;
+
+        if(tokenAddresses.length != priceFeedAddresses.length) {
+            revert AUSDEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
+        }
+
+        for (uint256 i = 0; i < tokenAddresses.length; i++) {
+            s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
+            s_tokensAllowed.push(tokenAddresses[i]);
+        }
+    }
+
+    //Public Functions
     function depositCollateral(address token, uint256 _amount) public onlyAllowedTokens(token) moreThanZero(_amount) {
         s_collateralDeposited[msg.sender][token] += _amount;
         emit CollateralDeposited(msg.sender, token, _amount);
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), _amount);
+    }
+
+    function depositCollateralAndMintAUSD(address token, uint256 _collateralAmount, uint256 _aUSDAmount) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(_aUSDAmount) {
+        depositCollateral(token, _collateralAmount);
+        mintAUSD(_aUSDAmount);
     }
 
     function redeemCollateral(address token, uint256 _amount) public onlyAllowedTokens(token) moreThanZero(_amount) {
@@ -92,11 +112,6 @@ contract AUSDEngine {
 
         _revertIfHealthFactorBroken(msg.sender);
         s_ausd.mint(msg.sender, _amount);
-    }
-
-    function depositCollateralAndMintAUSD(address token, uint256 _collateralAmount, uint256 _aUSDAmount) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(_aUSDAmount) {
-        depositCollateral(token, _collateralAmount);
-        mintAUSD(_aUSDAmount);
     }
 
     function burnAUSD(uint256 _amount) public moreThanZero(_amount) {
@@ -119,18 +134,13 @@ contract AUSDEngine {
         _burnAUSD(user, msg.sender, tokenAmount);
 
         uint256 endingHealthFactor = _getHealthFactor(user);
-
         if(endingHealthFactor <= startingHealthFactor) revert AUSDEngine__HealthFactorNotImproved();
+
         _revertIfHealthFactorBroken(msg.sender);
     }
 
-    function getTokenAmountFromUSD(address token, uint256 _amount) public view onlyAllowedTokens(token) returns(uint256) {
-        int256 price = _getPrice(token);
-
-        return ((_amount * PRECISION) / (uint256(price) * PRICE_ADITIONAL_PRECISION));
-    }
-
-    function getAccountInformation(address user) public view returns(uint256 totalUSDCollateral, uint256 aUSDDebt) {
+    //Private Functions
+    function _getAccountInformation(address user) public view returns(uint256 totalUSDCollateral, uint256 aUSDDebt) {
         if(user == address(0)) {
             revert AUSDEngine__NotZeroAddress();
         }
@@ -166,20 +176,9 @@ contract AUSDEngine {
     }
 
     function _getHealthFactor(address user) private view returns(uint256 healthFactor) {
-        (uint256 totalUSDCollateral, uint256 aUSDDebt) = getAccountInformation(user);
+        (uint256 totalUSDCollateral, uint256 aUSDDebt) = _getAccountInformation(user);
 
         healthFactor = _calculateHealthFactor(totalUSDCollateral, aUSDDebt);
-    }
-
-    function getTotalCollateralInUSD(address user) public view returns(uint256 totalAmount) {
-        if(user == address(0)) {
-            revert AUSDEngine__NotZeroAddress();
-        }
-
-        address[] memory tokens = s_tokensAllowed;
-        for(uint256 i = 0; i < tokens.length; i++) {
-            totalAmount += _getCollateralInUSD(tokens[i], user);
-        }
     }
 
     function _getPrice(address token) private view returns(int256) {
@@ -213,15 +212,34 @@ contract AUSDEngine {
         }
     }
 
+    //Public View Functions
+    function getTokenAmountFromUSD(address token, uint256 _amount) public view onlyAllowedTokens(token) returns(uint256) {
+        int256 price = _getPrice(token);
+
+        return ((_amount * PRECISION) / (uint256(price) * PRICE_ADITIONAL_PRECISION));
+    }
+
+    function getTotalCollateralInUSD(address user) public view returns(uint256 totalAmount) {
+        if(user == address(0)) {
+            revert AUSDEngine__NotZeroAddress();
+        }
+
+        address[] memory tokens = s_tokensAllowed;
+        for(uint256 i = 0; i < tokens.length; i++) {
+            totalAmount += _getCollateralInUSD(tokens[i], user);
+        }
+    }
+
+    function getHealthFactor() public view returns(uint256) {
+        return _getHealthFactor(msg.sender);
+    }
+
+    //Setters
     function setAUSD(AnchorUSD _ausd) public onlyOwner {
         if(address(s_ausd) != address(0)) {
             revert AUSDEngine__AUSDAlreadyDefined();
         }
 
         s_ausd = _ausd;
-    }
-
-    function getHealthFactor() public view returns(uint256 healthFactor) {
-        healthFactor = _getHealthFactor(msg.sender);
     }
 }
