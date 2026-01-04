@@ -12,6 +12,6 @@ contract AnchorUSDTest is Test {
 
     function setUp() external {
         deployer = new DeployAUSD();
-        aUSD = deployer.run();
+        (aUSD,,) = deployer.run();
     }
 }
