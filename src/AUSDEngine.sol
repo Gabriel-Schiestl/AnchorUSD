@@ -18,12 +18,15 @@ contract AUSDEngine {
     error AUSDEngine__MustBeMoreThanZero();
     error AUSDEngine__InsufficientCollateral();
     error AUSDEngine__HealthFactorBroken();
+    error AUSDEngine__HealthFactorOk();
+    error AUSDEngine__HealthFactorNotImproved();
 
     uint256 private constant PRICE_ADITIONAL_PRECISION = 1e10;
     uint256 private constant PRECISION = 1e18;
     uint256 private constant LIQUIDATION_THRESHOLD = 50;
     uint256 private constant LIQUIDATION_PRECISION = 100;
     uint256 private constant MIN_HEALTH_FACTOR = 1e18;
+    uint256 private constant LIQUIDATION_BONUS = 10;
 
     AnchorUSD private s_ausd;
     address private immutable i_owner;
@@ -41,7 +44,7 @@ contract AUSDEngine {
     }
 
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
-    event CollateralRedeemed(address indexed user, address indexed token, uint256 indexed amount);
+    event CollateralRedeemed(address indexed redeemedFrom, address indexed redeemedTo, address token, uint256 amount);
     event AUSDMinted(address indexed user, uint256 indexed amount);
 
     modifier onlyOwner() {
@@ -66,10 +69,6 @@ contract AUSDEngine {
     }
 
     function depositCollateral(address token, uint256 _amount) public onlyAllowedTokens(token) moreThanZero(_amount) {
-        if(token == address(0)) {
-            revert AUSDEngine__NotZeroAddress();
-        }
-
         s_collateralDeposited[msg.sender][token] += _amount;
         emit CollateralDeposited(msg.sender, token, _amount);
 
@@ -77,17 +76,8 @@ contract AUSDEngine {
     }
 
     function redeemCollateral(address token, uint256 _amount) public onlyAllowedTokens(token) moreThanZero(_amount) {
-        uint256 collateralDeposited = s_collateralDeposited[msg.sender][token];
-        if(_amount > collateralDeposited) {
-            revert AUSDEngine__InsufficientCollateral();
-        }
-
-        s_collateralDeposited[msg.sender][token] -= _amount;
-        emit CollateralRedeemed(msg.sender, token, _amount);
-
+        _redeemCollateral(msg.sender, msg.sender, token, _amount);
         _revertIfHealthFactorBroken(msg.sender);
-
-        IERC20(token).safeTransfer(msg.sender, _amount);
     }
 
     function redeemCollateralForAUSD(address token, uint256 _collateralAmount, uint256 aUSDToBurn) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(aUSDToBurn) {
@@ -113,8 +103,31 @@ contract AUSDEngine {
         _burnAUSD(msg.sender, msg.sender, _amount);
     }
 
-    function liquidate(address who, uint256 _amount) public moreThanZero(_amount) {
-        if(who == address(0)) revert AUSDEngine__NotZeroAddress();
+    function liquidate(address user, address token, uint256 debtToCover) public onlyAllowedTokens(token) moreThanZero(debtToCover) {
+        if(user == address(0)) revert AUSDEngine__NotZeroAddress();
+        
+        uint256 startingHealthFactor = _getHealthFactor(user);
+        if(startingHealthFactor >= MIN_HEALTH_FACTOR) revert AUSDEngine__HealthFactorOk();
+
+        if(s_collateralDeposited[user][token] == 0) revert AUSDEngine__InsufficientCollateral();
+
+        uint256 tokenAmount = getTokenAmountFromUSD(token, debtToCover);
+
+        uint256 bonusCollateral = ((tokenAmount * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION);
+
+        _redeemCollateral(user, msg.sender, token, tokenAmount + bonusCollateral);
+        _burnAUSD(user, msg.sender, tokenAmount);
+
+        uint256 endingHealthFactor = _getHealthFactor(user);
+
+        if(endingHealthFactor <= startingHealthFactor) revert AUSDEngine__HealthFactorNotImproved();
+        _revertIfHealthFactorBroken(msg.sender);
+    }
+
+    function getTokenAmountFromUSD(address token, uint256 _amount) public view onlyAllowedTokens(token) returns(uint256) {
+        int256 price = _getPrice(token);
+
+        return ((_amount * PRECISION) / (uint256(price) * PRICE_ADITIONAL_PRECISION));
     }
 
     function getAccountInformation(address user) public view returns(uint256 totalUSDCollateral, uint256 aUSDDebt) {
@@ -126,18 +139,36 @@ contract AUSDEngine {
         totalUSDCollateral = getTotalCollateralInUSD(user);
     }
 
+    function _redeemCollateral(address from, address to, address token, uint256 _amount) private {
+        uint256 collateralDeposited = s_collateralDeposited[from][token];
+        if(_amount > collateralDeposited) {
+            revert AUSDEngine__InsufficientCollateral();
+        }
+
+        s_collateralDeposited[from][token] -= _amount;
+        emit CollateralRedeemed(from, to, token, _amount);
+
+        IERC20(token).safeTransfer(to, _amount);
+    }
+
     function _burnAUSD(address onBehalfOf, address aUSDFrom, uint256 _amount) private  {
         s_totalDept[onBehalfOf] -= _amount;
 
         s_ausd.burn(aUSDFrom, _amount);
     }
 
-    function _getHealthFactor(uint256 totalUSDCollateral, uint256 aUSDDebt) private pure returns(uint256 healthFactor) {
+    function _calculateHealthFactor(uint256 totalUSDCollateral, uint256 aUSDDebt) private pure returns(uint256 healthFactor) {
         if(aUSDDebt == 0) return type(uint256).max;
 
         uint256 collateralAdjusted = (totalUSDCollateral * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
 
         healthFactor = (collateralAdjusted * PRECISION) / aUSDDebt;
+    }
+
+    function _getHealthFactor(address user) private view returns(uint256 healthFactor) {
+        (uint256 totalUSDCollateral, uint256 aUSDDebt) = getAccountInformation(user);
+
+        healthFactor = _calculateHealthFactor(totalUSDCollateral, aUSDDebt);
     }
 
     function getTotalCollateralInUSD(address user) public view returns(uint256 totalAmount) {
@@ -151,7 +182,7 @@ contract AUSDEngine {
         }
     }
 
-    function _getCollateralInUSD(address token, address user) private view returns(uint256) {
+    function _getPrice(address token) private view returns(int256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
 
         (,int256 price,,,) = priceFeed.latestRoundData();
@@ -159,6 +190,12 @@ contract AUSDEngine {
         if(price < 0) {
             revert AUSDEngine__InvalidPrice();
         }
+
+        return price;
+    }
+
+    function _getCollateralInUSD(address token, address user) private view returns(uint256) {
+        int256 price = _getPrice(token);
 
         uint256 priceAdjusted = uint256(price) * PRICE_ADITIONAL_PRECISION;
 
@@ -170,9 +207,7 @@ contract AUSDEngine {
     }
 
     function _revertIfHealthFactorBroken(address user) private view {
-        (uint256 totalUSDCollateral, uint256 aUSDDebt) = getAccountInformation(user);
-
-        uint256 healthFactor = _getHealthFactor(totalUSDCollateral, aUSDDebt);
+        uint256 healthFactor = _getHealthFactor(user);
         if(healthFactor < MIN_HEALTH_FACTOR) {
             revert AUSDEngine__HealthFactorBroken();
         }
@@ -184,5 +219,9 @@ contract AUSDEngine {
         }
 
         s_ausd = _ausd;
+    }
+
+    function getHealthFactor() public view returns(uint256 healthFactor) {
+        healthFactor = _getHealthFactor(msg.sender);
     }
 }
