@@ -93,6 +93,7 @@ contract AUSDEngine {
     function redeemCollateralForAUSD(address token, uint256 _collateralAmount, uint256 aUSDToBurn) public onlyAllowedTokens(token) moreThanZero(_collateralAmount) moreThanZero(aUSDToBurn) {
         _burnAUSD(msg.sender, msg.sender, aUSDToBurn);
         redeemCollateral(token, _collateralAmount);
+        _revertIfHealthFactorBroken(msg.sender);
     }
 
     function mintAUSD(uint256 _amount) public moreThanZero(_amount) {
@@ -112,7 +113,9 @@ contract AUSDEngine {
         _burnAUSD(msg.sender, msg.sender, _amount);
     }
 
-    function liquidate(address who, uint256 _amount) public moreThanZero(_amount) {}
+    function liquidate(address who, uint256 _amount) public moreThanZero(_amount) {
+        if(who == address(0)) revert AUSDEngine__NotZeroAddress();
+    }
 
     function getAccountInformation(address user) public view returns(uint256 totalUSDCollateral, uint256 aUSDDebt) {
         if(user == address(0)) {
