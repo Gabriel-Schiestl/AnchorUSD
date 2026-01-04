@@ -6,6 +6,7 @@ import {AnchorUSD} from "./AnchorUSD.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {OracleLib} from "./lib/OracleLib.sol";
 
 contract AUSDEngine {
     //Errors
@@ -23,6 +24,7 @@ contract AUSDEngine {
 
     //Types
     using SafeERC20 for IERC20;
+    using OracleLib for AggregatorV3Interface;
 
     //State Variables
     AnchorUSD private s_ausd;
@@ -77,10 +79,10 @@ contract AUSDEngine {
         }
 
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
-            if((tokenAddresses[i] == address(0)) || (priceFeedAddresses[i] == address(0))) {
+            if ((tokenAddresses[i] == address(0)) || (priceFeedAddresses[i] == address(0))) {
                 revert AUSDEngine__NotZeroAddress();
             }
-            
+
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
             s_tokensAllowed.push(tokenAddresses[i]);
         }
@@ -207,7 +209,7 @@ contract AUSDEngine {
     function _getPrice(address token) private view returns (int256) {
         AggregatorV3Interface priceFeed = AggregatorV3Interface(s_priceFeeds[token]);
 
-        (, int256 price,,,) = priceFeed.latestRoundData();
+        (, int256 price,,,) = priceFeed.staleCheckLatestRoundData();
 
         if (price < 0) {
             revert AUSDEngine__InvalidPrice();
