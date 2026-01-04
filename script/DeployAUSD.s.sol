@@ -9,8 +9,7 @@ import {AnchorUSD} from "../src/AnchorUSD.sol";
 contract DeployAUSD is Script {
     HelperConfig config;
 
-    function run() external returns(AnchorUSD) {
-        config = new HelperConfig(); 
-        
+    function run() external returns (AnchorUSD) {
+        config = new HelperConfig();
     }
 }
