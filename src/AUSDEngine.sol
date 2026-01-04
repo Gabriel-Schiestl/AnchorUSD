@@ -44,6 +44,7 @@ contract AUSDEngine {
     event CollateralDeposited(address indexed user, address indexed token, uint256 indexed amount);
     event CollateralRedeemed(address indexed redeemedFrom, address indexed redeemedTo, address token, uint256 amount);
     event AUSDMinted(address indexed user, uint256 indexed amount);
+    event AUSDBurned(address indexed from, uint256 indexed amount);
 
     //Modifiers
     modifier onlyOwner() {
@@ -76,6 +77,10 @@ contract AUSDEngine {
         }
 
         for (uint256 i = 0; i < tokenAddresses.length; i++) {
+            if((tokenAddresses[i] == address(0)) || (priceFeedAddresses[i] == address(0))) {
+                revert AUSDEngine__NotZeroAddress();
+            }
+            
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
             s_tokensAllowed.push(tokenAddresses[i]);
         }
@@ -112,7 +117,6 @@ contract AUSDEngine {
     {
         _burnAUSD(msg.sender, msg.sender, aUSDToBurn);
         redeemCollateral(token, _collateralAmount);
-        _revertIfHealthFactorBroken(msg.sender);
     }
 
     function mintAUSD(uint256 _amount) public moreThanZero(_amount) {
@@ -144,7 +148,7 @@ contract AUSDEngine {
         uint256 bonusCollateral = ((tokenAmount * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION);
 
         _redeemCollateral(user, msg.sender, token, tokenAmount + bonusCollateral);
-        _burnAUSD(user, msg.sender, tokenAmount);
+        _burnAUSD(user, msg.sender, debtToCover);
 
         uint256 endingHealthFactor = _getHealthFactor(user);
         if (endingHealthFactor <= startingHealthFactor) revert AUSDEngine__HealthFactorNotImproved();
@@ -153,7 +157,7 @@ contract AUSDEngine {
     }
 
     //Private Functions
-    function _getAccountInformation(address user) public view returns (uint256 totalUSDCollateral, uint256 aUSDDebt) {
+    function _getAccountInformation(address user) private view returns (uint256 totalUSDCollateral, uint256 aUSDDebt) {
         if (user == address(0)) {
             revert AUSDEngine__NotZeroAddress();
         }
@@ -176,6 +180,8 @@ contract AUSDEngine {
 
     function _burnAUSD(address onBehalfOf, address aUSDFrom, uint256 _amount) private {
         s_totalDebt[onBehalfOf] -= _amount;
+
+        emit AUSDBurned(aUSDFrom, _amount);
 
         s_ausd.burn(aUSDFrom, _amount);
     }
