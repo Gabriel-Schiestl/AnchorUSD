@@ -52,7 +52,7 @@ contract HelperConfig is Script {
             "WETH",
             "WETH",
             vm.addr(DEFAULT_ANVIL_PRIVATE_KEY),
-            1000e8
+            10000e18
         );
 
         MockV3Aggregator btcUsdPriceFeed = new MockV3Aggregator(
@@ -63,7 +63,7 @@ contract HelperConfig is Script {
             "WBTC",
             "WBTC",
             vm.addr(DEFAULT_ANVIL_PRIVATE_KEY),
-            1000e8
+            10000e18
         );
         vm.stopBroadcast();
 
