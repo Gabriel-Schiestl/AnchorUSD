@@ -35,7 +35,6 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
  * @notice Based on the MakerDAO DSS (DAI Stablecoin System)
  */
 contract AUSDEngine is ReentrancyGuard {
-
     //////// Errors ////////
 
     /// @notice Error thrown when someone other than the owner tries to execute a restricted function
@@ -71,13 +70,15 @@ contract AUSDEngine is ReentrancyGuard {
     /// @notice Error thrown when token and price feed arrays have different sizes
     error AUSDEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
 
+    /// @notice Error thrown when amount of tokens to burn is higher than the user's debt
+    error AUSDEngine__BurnAmountExceedsDebt();
+
     // Type Declarations
     /// @dev Using SafeERC20 for safe operations with ERC20 tokens
     using SafeERC20 for IERC20;
 
     /// @dev Using OracleLib for staleness checks of price feeds
     using OracleLib for AggregatorV3Interface;
-
 
     //////// State Variables ////////
 
@@ -124,7 +125,6 @@ contract AUSDEngine is ReentrancyGuard {
     /// Used to iterate over all collateral types when calculating total value
     address[] private s_tokensAllowed;
 
-
     //////// Events ////////
 
     /**
@@ -168,7 +168,6 @@ contract AUSDEngine is ReentrancyGuard {
      */
     event AUSDBurned(address indexed from, uint256 indexed amount);
 
-
     //////// Modifiers ////////
 
     /**
@@ -205,7 +204,6 @@ contract AUSDEngine is ReentrancyGuard {
         }
         _;
     }
-
 
     //////// Functions ////////
 
@@ -245,7 +243,6 @@ contract AUSDEngine is ReentrancyGuard {
             s_tokensAllowed.push(tokenAddresses[i]);
         }
     }
-
 
     //////// Public Functions ////////
 
@@ -362,7 +359,8 @@ contract AUSDEngine is ReentrancyGuard {
         nonReentrant
     {
         _burnAUSD(msg.sender, msg.sender, aUSDToBurn);
-        redeemCollateral(token, _collateralAmount);
+        _redeemCollateral(msg.sender, msg.sender, token, _collateralAmount);
+        _revertIfHealthFactorBroken(msg.sender);
     }
 
     /**
@@ -479,9 +477,8 @@ contract AUSDEngine is ReentrancyGuard {
         _revertIfHealthFactorBroken(msg.sender);
     }
 
-
     //////// Private Functions ////////
-    
+
     /**
      * @notice Gets user account information
      * @param user User address
@@ -561,13 +558,15 @@ contract AUSDEngine is ReentrancyGuard {
         address aUSDFrom,
         uint256 _amount
     ) private {
+        if (s_totalDebt[onBehalfOf] < _amount)
+            revert AUSDEngine__BurnAmountExceedsDebt();
+
         s_totalDebt[onBehalfOf] -= _amount;
 
         emit AUSDBurned(aUSDFrom, _amount);
 
         s_ausd.burn(aUSDFrom, _amount);
     }
-
 
     //////// Private & Internal View & Pure Functions ////////
 
@@ -693,7 +692,6 @@ contract AUSDEngine is ReentrancyGuard {
             revert AUSDEngine__HealthFactorBroken();
         }
     }
-
 
     //////// External & Public View & Pure Functions ////////
 
@@ -883,7 +881,6 @@ contract AUSDEngine is ReentrancyGuard {
         int256 price = _getPrice(token);
         return uint256(price) * PRICE_ADITIONAL_PRECISION;
     }
-
 
     //////// Setters (Owner Only) ////////
 

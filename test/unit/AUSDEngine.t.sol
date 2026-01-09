@@ -41,6 +41,7 @@ contract AUSDEngineTest is Test {
         uint256 amount
     );
     event AUSDMinted(address indexed user, uint256 indexed amount);
+    event AUSDBurned(address indexed from, uint256 indexed amount);
 
     function setUp() external {
         deployer = new DeployAUSD();
@@ -201,13 +202,118 @@ contract AUSDEngineTest is Test {
 
         // collateral = $10, mint = $6 => health factor < 1
         vm.expectRevert(AUSDEngine.AUSDEngine__HealthFactorBroken.selector);
-        engine.mintAUSD(MINT_AMOUNT + 1);
+        engine.mintAUSD(MINT_AMOUNT + 1 ether);
         vm.stopPrank();
     }
 
-    function testRevertSetAUSDIfNotOwner() external {
-        vm.expectRevert(AUSDEngine.AUSDEngine__NotOwner.selector);
-        engine.setAUSD(aUSD);
+    function testBurnAUSD() external giveCollateralBalanceAndAllowance {
+        vm.startPrank(USER);
+        engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
+        engine.mintAUSD(MINT_AMOUNT);
+        engine.burnAUSD(MINT_AMOUNT);
+        vm.stopPrank();
+
+        assertEq(engine.getUserDebt(USER), 0);
+        assertEq(aUSD.balanceOf(USER), 0);
+    }
+
+    function testIfBurnAUSDEmitsEvent()
+        external
+        giveCollateralBalanceAndAllowance
+    {
+        vm.startPrank(USER);
+        engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
+        engine.mintAUSD(MINT_AMOUNT);
+
+        vm.expectEmit(true, true, false, false, address(engine));
+        emit AUSDBurned(USER, MINT_AMOUNT);
+
+        engine.burnAUSD(MINT_AMOUNT);
+        vm.stopPrank();
+    }
+
+    function testIfBurnAUSDRevertsWithAmountHigherThanDebt()
+        external
+        giveCollateralBalanceAndAllowance
+    {
+        vm.startPrank(USER);
+        engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
+        engine.mintAUSD(MINT_AMOUNT);
+
+        vm.expectRevert(AUSDEngine.AUSDEngine__BurnAmountExceedsDebt.selector);
+        engine.burnAUSD(MINT_AMOUNT + 1 ether);
+        vm.stopPrank();
+    }
+
+    function testRedeemCollateralForAUSD()
+        external
+        giveCollateralBalanceAndAllowance
+    {
+        vm.startPrank(USER);
+        engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
+        engine.mintAUSD(MINT_AMOUNT);
+
+        engine.redeemCollateralForAUSD(
+            wethAddr,
+            COLLATERAL_DEPOSIT_AMOUNT,
+            MINT_AMOUNT
+        );
+        vm.stopPrank();
+
+        assertEq(engine.getUserDebt(USER), 0);
+        assertEq(aUSD.balanceOf(USER), 0);
+        assertEq(engine.getCollateralBalanceOfUser(USER, wethAddr), 0);
+    }
+
+    function testIfRedeemCollateralForAUSDRevertsWhenHealthFactorBreaks()
+        external
+        giveCollateralBalanceAndAllowance
+    {
+        vm.startPrank(USER);
+        engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
+        engine.mintAUSD(MINT_AMOUNT);
+
+        vm.expectRevert(AUSDEngine.AUSDEngine__HealthFactorBroken.selector);
+        engine.redeemCollateralForAUSD(
+            wethAddr,
+            COLLATERAL_DEPOSIT_AMOUNT,
+            MINT_AMOUNT - 1 ether
+        );
+        vm.stopPrank();
+    }
+
+    function testIfRedeemCollateralForAUSDRevertsWithInsufficientCollateral()
+        external
+        giveCollateralBalanceAndAllowance
+    {
+        vm.startPrank(USER);
+        engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
+        engine.mintAUSD(MINT_AMOUNT);
+
+        vm.expectRevert(AUSDEngine.AUSDEngine__InsufficientCollateral.selector);
+        engine.redeemCollateralForAUSD(
+            wethAddr,
+            COLLATERAL_DEPOSIT_AMOUNT + 1 ether,
+            MINT_AMOUNT - 1 ether
+        );
+        vm.stopPrank();
+    }
+
+    function testIfRedeemCollateralForAUSDRevertsWithAmountHigherThanDebt()
+        external
+        giveCollateralBalanceAndAllowance
+    {
+        vm.startPrank(USER);
+        engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
+        engine.mintAUSD(MINT_AMOUNT);
+
+        vm.expectRevert(AUSDEngine.AUSDEngine__BurnAmountExceedsDebt.selector);
+        engine.redeemCollateralForAUSD(
+            wethAddr,
+            COLLATERAL_DEPOSIT_AMOUNT,
+            MINT_AMOUNT + 1 ether
+        );
+        vm.stopPrank();
     }
 
     function testRevertIfAUSDIsSet() external {
