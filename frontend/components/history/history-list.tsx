@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { useAccount } from "wagmi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,121 +13,12 @@ import {
   AlertTriangle,
   ExternalLink,
 } from "lucide-react";
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-type TransactionType = "deposit" | "mint" | "burn" | "liquidation";
-
-interface Transaction {
-  id: string;
-  type: TransactionType;
-  amount: string;
-  asset: string;
-  timestamp: string;
-  txHash: string;
-  status: "completed" | "pending" | "failed";
-}
-
-const mockHistoryData = {
-  deposits: [
-    {
-      id: "1",
-      type: "deposit",
-      amount: "2.5",
-      asset: "ETH",
-      timestamp: "2025-01-12T10:30:00Z",
-      txHash: "0x1234...abcd",
-      status: "completed",
-    },
-    {
-      id: "2",
-      type: "deposit",
-      amount: "0.08",
-      asset: "WBTC",
-      timestamp: "2025-01-11T14:20:00Z",
-      txHash: "0x5678...efgh",
-      status: "completed",
-    },
-    {
-      id: "3",
-      type: "deposit",
-      amount: "1.2",
-      asset: "ETH",
-      timestamp: "2025-01-10T09:15:00Z",
-      txHash: "0x9abc...ijkl",
-      status: "completed",
-    },
-  ],
-  mintBurn: [
-    {
-      id: "4",
-      type: "mint",
-      amount: "5,000.00",
-      asset: "USC",
-      timestamp: "2025-01-12T11:00:00Z",
-      txHash: "0xdef0...mnop",
-      status: "completed",
-    },
-    {
-      id: "5",
-      type: "burn",
-      amount: "1,500.00",
-      asset: "USC",
-      timestamp: "2025-01-11T16:45:00Z",
-      txHash: "0x1111...qrst",
-      status: "completed",
-    },
-    {
-      id: "6",
-      type: "mint",
-      amount: "3,500.00",
-      asset: "USC",
-      timestamp: "2025-01-09T08:30:00Z",
-      txHash: "0x2222...uvwx",
-      status: "completed",
-    },
-  ],
-  liquidations: [
-    {
-      id: "7",
-      type: "liquidation",
-      amount: "800.00",
-      asset: "USC",
-      timestamp: "2025-01-05T22:10:00Z",
-      txHash: "0x3333...yzab",
-      status: "completed",
-    },
-  ],
-} as const;
-
-const typeConfig = {
-  deposit: {
-    icon: PiggyBank,
-    label: "Depósito",
-    color: "bg-primary/10 text-primary",
-  },
-  mint: { icon: Coins, label: "Mint", color: "bg-chart-2/10 text-chart-2" },
-  burn: {
-    icon: Flame,
-    label: "Burn",
-    color: "bg-destructive/10 text-destructive",
-  },
-  liquidation: {
-    icon: AlertTriangle,
-    label: "Liquidação",
-    color: "bg-chart-5/10 text-chart-5",
-  },
-};
-
-function formatDate(dateString: string) {
-  return new Date(dateString).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { get, HistoryData } from "@/api/get";
+import Transaction from "@/models/Transaction";
+import { mockHistoryData } from "@/api/mocks/history";
+import { formatDate } from "@/lib/date";
+import { typeConfig } from "@/models/TypeConfig";
+import { ConnectWalletPrompt } from "@/components/connect-wallet-prompt";
 
 function TransactionItem({ tx }: { tx: Transaction }) {
   const config = typeConfig[tx.type];
@@ -145,10 +37,10 @@ function TransactionItem({ tx }: { tx: Transaction }) {
             <span className="font-medium text-foreground">{config.label}</span>
             <Badge variant="outline" className="text-xs">
               {tx.status === "completed"
-                ? "Concluído"
+                ? "Completed"
                 : tx.status === "pending"
-                ? "Pendente"
-                : "Falhou"}
+                ? "Pending"
+                : "Failed"}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -178,9 +70,19 @@ function TransactionItem({ tx }: { tx: Transaction }) {
 }
 
 export function HistoryList() {
-  const { data, isLoading } = useSWR("/api/history", fetcher, {
+  const { isConnected } = useAccount();
+  const { data, isLoading } = useSWR("/history", get<HistoryData>, {
     fallbackData: mockHistoryData,
   });
+
+  if (!isConnected) {
+    return (
+      <ConnectWalletPrompt
+        icon={AlertTriangle}
+        description="Connect your wallet to view your transaction history"
+      />
+    );
+  }
 
   if (isLoading) {
     return <HistorySkeleton />;
@@ -191,19 +93,19 @@ export function HistoryList() {
       <TabsList className="grid w-full grid-cols-3 bg-secondary">
         <TabsTrigger
           value="deposits"
-          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
         >
           Deposits
         </TabsTrigger>
         <TabsTrigger
           value="mintburn"
-          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
         >
           Mint / Burn
         </TabsTrigger>
         <TabsTrigger
           value="liquidations"
-          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
         >
           Liquidations
         </TabsTrigger>

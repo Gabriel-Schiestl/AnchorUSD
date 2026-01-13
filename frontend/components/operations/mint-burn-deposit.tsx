@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -20,46 +20,121 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { ArrowDownUp, Coins, PiggyBank, Flame, Loader2 } from "lucide-react";
-
-const collateralAssets = [
-  { symbol: "ETH", name: "Ethereum", icon: "Ξ" },
-  { symbol: "WBTC", name: "Wrapped Bitcoin", icon: "₿" },
-];
+import { ConnectWalletPrompt } from "@/components/connect-wallet-prompt";
+import {
+  ArrowDownUp,
+  Coins,
+  PiggyBank,
+  Flame,
+  Loader2,
+  RefreshCw,
+  AlertTriangle,
+} from "lucide-react";
+import { useWalletBalance } from "@/hooks/useWalletBalance";
+import { useAUSDEngine } from "@/hooks/useAUSDEngine";
+import { collateralAssets, TOKEN_ADDRESSES } from "@/lib/constants";
 
 export function MintBurnDeposit() {
   const { isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState("deposit");
-  const [selectedAsset, setSelectedAsset] = useState("ETH");
+  const [selectedAsset, setSelectedAsset] = useState("WETH");
   const [amount, setAmount] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [healthFactorProjection, setHealthFactorProjection] = useState<
+    string | null
+  >(null);
+
+  const selectedTokenAddress = collateralAssets.find(
+    (asset) => asset.symbol === selectedAsset
+  )?.address;
+
+  const {
+    balance: assetBalance,
+    isLoading: isLoadingBalance,
+    refresh: refreshAssetBalance,
+  } = useWalletBalance(selectedTokenAddress);
+
+  const { balance: ausdBalance, refresh: refreshAusdBalance } =
+    useWalletBalance(TOKEN_ADDRESSES.AUSD);
+
+  const {
+    engineData,
+    isLoading: isLoadingEngine,
+    refresh: refreshEngineData,
+    calculateHealthFactorAfterMint,
+    calculateHealthFactorAfterBurn,
+    calculateHealthFactorAfterDeposit,
+  } = useAUSDEngine();
+
+  useEffect(() => {
+    const updateHealthFactorProjection = async () => {
+      if (!amount || isNaN(parseFloat(amount))) {
+        setHealthFactorProjection(null);
+        return;
+      }
+
+      try {
+        let projection = null;
+
+        if (activeTab === "mint") {
+          projection = await calculateHealthFactorAfterMint(amount);
+        } else if (activeTab === "burn") {
+          projection = await calculateHealthFactorAfterBurn(amount);
+        } else if (activeTab === "deposit" && selectedTokenAddress) {
+          projection = await calculateHealthFactorAfterDeposit(
+            selectedTokenAddress,
+            amount
+          );
+        }
+
+        if (projection) {
+          setHealthFactorProjection(projection.healthFactorAfter);
+        }
+      } catch (error) {
+        console.error("Error calculating health factor:", error);
+        setHealthFactorProjection(null);
+      }
+    };
+
+    const debounce = setTimeout(updateHealthFactorProjection, 500);
+    return () => clearTimeout(debounce);
+  }, [amount, activeTab, selectedTokenAddress]);
 
   const handleSubmit = async (action: string) => {
     setIsLoading(true);
-    // Simular transação
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-    setIsLoading(false);
-    setAmount("");
+    try {
+      // Implement logic to interact with smart contracts here
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      await Promise.all([
+        refreshAssetBalance(),
+        refreshAusdBalance(),
+        refreshEngineData(),
+      ]);
+
+      setAmount("");
+      setHealthFactorProjection(null);
+    } catch (error) {
+      console.error(`Error during ${action}:`, error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRefresh = async () => {
+    await Promise.all([
+      refreshAssetBalance(),
+      refreshAusdBalance(),
+      refreshEngineData(),
+    ]);
   };
 
   if (!isConnected) {
     return (
-      <Card className="border-border bg-card">
-        <CardContent className="flex flex-col items-center justify-center py-16">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
-            <Coins className="h-8 w-8 text-primary" />
-          </div>
-          <h3 className="mb-2 text-xl font-semibold text-foreground">
-            Connect your wallet
-          </h3>
-          <p className="mb-6 text-center text-muted-foreground">
-            To perform mint, burn, or deposit operations, you need to connect
-            your wallet.
-          </p>
-          <ConnectButton />
-        </CardContent>
-      </Card>
+      <ConnectWalletPrompt
+        icon={AlertTriangle}
+        description="To perform mint, burn, or deposit operations, you need to connect your wallet."
+      />
     );
   }
 
@@ -68,21 +143,21 @@ export function MintBurnDeposit() {
       <TabsList className="grid w-full grid-cols-3 bg-secondary">
         <TabsTrigger
           value="deposit"
-          className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
         >
           <PiggyBank className="h-4 w-4" />
           Deposit
         </TabsTrigger>
         <TabsTrigger
           value="mint"
-          className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
         >
           <Coins className="h-4 w-4" />
           Mint
         </TabsTrigger>
         <TabsTrigger
           value="burn"
-          className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+          className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
         >
           <Flame className="h-4 w-4" />
           Burn
@@ -92,25 +167,44 @@ export function MintBurnDeposit() {
       <TabsContent value="deposit">
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <PiggyBank className="h-5 w-5 text-primary" />
-              Deposit Collateral
-            </CardTitle>
-            <CardDescription>
-              Deposit your assets as collateral to mint stablecoins
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <PiggyBank className="h-5 w-5 text-primary" />
+                  Deposit Collateral
+                </CardTitle>
+                <CardDescription>
+                  Deposit your assets as collateral to mint stablecoins
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isLoadingBalance || isLoadingEngine}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${
+                    isLoadingBalance || isLoadingEngine ? "animate-spin" : ""
+                  }`}
+                />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="collateral-asset">Collateral Asset</Label>
               <Select value={selectedAsset} onValueChange={setSelectedAsset}>
-                <SelectTrigger id="collateral-asset" className="bg-secondary">
+                <SelectTrigger
+                  id="collateral-asset"
+                  className="bg-secondary hover:cursor-pointer"
+                >
                   <SelectValue placeholder="Select an asset" />
                 </SelectTrigger>
                 <SelectContent>
                   {collateralAssets.map((asset) => (
                     <SelectItem key={asset.symbol} value={asset.symbol}>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 hover:cursor-pointer">
                         <span className="font-mono">{asset.icon}</span>
                         <span>{asset.symbol}</span>
                         <span className="text-muted-foreground">
@@ -137,15 +231,41 @@ export function MintBurnDeposit() {
                   {selectedAsset}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Available balance: 10.5 {selectedAsset}
-              </p>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Available balance:
+                </span>
+                <span className="font-mono">
+                  {isLoadingBalance ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : (
+                    `${parseFloat(assetBalance).toFixed(4)} ${selectedAsset}`
+                  )}
+                </span>
+              </div>
             </div>
+            {healthFactorProjection && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <ArrowDownUp className="h-4 w-4 text-primary" />
+                  <span className="text-muted-foreground">
+                    Health Factor after deposit:
+                  </span>
+                  <span className="font-mono font-semibold text-primary">
+                    {parseFloat(healthFactorProjection).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
             <Button
-              className="w-full"
+              className="w-full hover:cursor-pointer"
               size="lg"
               onClick={() => handleSubmit("deposit")}
-              disabled={!amount || isLoading}
+              disabled={
+                !amount ||
+                isLoading ||
+                parseFloat(amount) > parseFloat(assetBalance)
+              }
             >
               {isLoading ? (
                 <>
@@ -166,13 +286,27 @@ export function MintBurnDeposit() {
       <TabsContent value="mint">
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <Coins className="h-5 w-5 text-primary" />
-              Mint Stablecoin
-            </CardTitle>
-            <CardDescription>
-              Mint stablecoins using your deposited collateral
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Coins className="h-5 w-5 text-primary" />
+                  Mint Stablecoin
+                </CardTitle>
+                <CardDescription>
+                  Mint stablecoins using your deposited collateral
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isLoadingEngine}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isLoadingEngine ? "animate-spin" : ""}`}
+                />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-border bg-secondary/50 p-4">
@@ -180,13 +314,47 @@ export function MintBurnDeposit() {
                 <span className="text-sm text-muted-foreground">
                   Available Collateral Value
                 </span>
-                <span className="font-mono text-foreground">$15,420.00</span>
+                <span className="font-mono text-foreground">
+                  {isLoadingEngine ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : (
+                    `$${
+                      engineData?.collateralValueUSD
+                        ? parseFloat(engineData.collateralValueUSD).toFixed(2)
+                        : "0.00"
+                    }`
+                  )}
+                </span>
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
                   Maximum Mintable
                 </span>
-                <span className="font-mono text-primary">$10,280.00</span>
+                <span className="font-mono text-primary">
+                  {isLoadingEngine ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : (
+                    `$${
+                      engineData?.maxMintable
+                        ? parseFloat(engineData.maxMintable).toFixed(2)
+                        : "0.00"
+                    }`
+                  )}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Current Health Factor
+                </span>
+                <span className="font-mono text-foreground">
+                  {isLoadingEngine ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : engineData?.currentHealthFactor ? (
+                    parseFloat(engineData.currentHealthFactor).toFixed(2)
+                  ) : (
+                    "N/A"
+                  )}
+                </span>
               </div>
             </div>
             <div className="space-y-2">
@@ -201,26 +369,33 @@ export function MintBurnDeposit() {
                   className="bg-secondary pr-16"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  USC
+                  AUSD
                 </span>
               </div>
             </div>
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-              <div className="flex items-center gap-2 text-sm">
-                <ArrowDownUp className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">
-                  Health Factor after mint:
-                </span>
-                <span className="font-mono font-semibold text-primary">
-                  1.85
-                </span>
+            {healthFactorProjection && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <ArrowDownUp className="h-4 w-4 text-primary" />
+                  <span className="text-muted-foreground">
+                    Health Factor after mint:
+                  </span>
+                  <span className="font-mono font-semibold text-primary">
+                    {parseFloat(healthFactorProjection).toFixed(2)}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
             <Button
               className="w-full"
               size="lg"
               onClick={() => handleSubmit("mint")}
-              disabled={!amount || isLoading}
+              disabled={
+                !amount ||
+                isLoading ||
+                !engineData ||
+                parseFloat(amount) > parseFloat(engineData.maxMintable || "0")
+              }
             >
               {isLoading ? (
                 <>
@@ -230,7 +405,7 @@ export function MintBurnDeposit() {
               ) : (
                 <>
                   <Coins className="mr-2 h-4 w-4" />
-                  Mint USC
+                  Mint AUSD
                 </>
               )}
             </Button>
@@ -241,27 +416,71 @@ export function MintBurnDeposit() {
       <TabsContent value="burn">
         <Card className="border-border bg-card">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <Flame className="h-5 w-5 text-destructive" />
-              Burn Stablecoin
-            </CardTitle>
-            <CardDescription>
-              Burn stablecoins to release your collateral
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <Flame className="h-5 w-5 text-destructive" />
+                  Burn Stablecoin
+                </CardTitle>
+                <CardDescription>
+                  Burn stablecoins to release your collateral
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isLoadingEngine}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isLoadingEngine ? "animate-spin" : ""}`}
+                />
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-lg border border-border bg-secondary/50 p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
-                  USC Balance
+                  AUSD Balance
                 </span>
-                <span className="font-mono text-foreground">5,000.00 USC</span>
+                <span className="font-mono text-foreground">
+                  {isLoadingBalance ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : (
+                    `${parseFloat(ausdBalance).toFixed(2)} AUSD`
+                  )}
+                </span>
               </div>
               <div className="mt-2 flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">
                   Total Debt
                 </span>
-                <span className="font-mono text-destructive">3,500.00 USC</span>
+                <span className="font-mono text-destructive">
+                  {isLoadingEngine ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : (
+                    `${
+                      engineData?.totalDebt
+                        ? parseFloat(engineData.totalDebt).toFixed(2)
+                        : "0.00"
+                    } AUSD`
+                  )}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Current Health Factor
+                </span>
+                <span className="font-mono text-foreground">
+                  {isLoadingEngine ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : engineData?.currentHealthFactor ? (
+                    parseFloat(engineData.currentHealthFactor).toFixed(2)
+                  ) : (
+                    "N/A"
+                  )}
+                </span>
               </div>
             </div>
             <div className="space-y-2">
@@ -276,27 +495,35 @@ export function MintBurnDeposit() {
                   className="bg-secondary pr-16"
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                  USC
+                  AUSD
                 </span>
               </div>
             </div>
-            <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
-              <div className="flex items-center gap-2 text-sm">
-                <ArrowDownUp className="h-4 w-4 text-primary" />
-                <span className="text-muted-foreground">
-                  Health Factor after burn:
-                </span>
-                <span className="font-mono font-semibold text-primary">
-                  2.45
-                </span>
+            {healthFactorProjection && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <ArrowDownUp className="h-4 w-4 text-primary" />
+                  <span className="text-muted-foreground">
+                    Health Factor after burn:
+                  </span>
+                  <span className="font-mono font-semibold text-primary">
+                    {parseFloat(healthFactorProjection).toFixed(2)}
+                  </span>
+                </div>
               </div>
-            </div>
+            )}
             <Button
               variant="destructive"
               className="w-full"
               size="lg"
               onClick={() => handleSubmit("burn")}
-              disabled={!amount || isLoading}
+              disabled={
+                !amount ||
+                isLoading ||
+                parseFloat(amount) > parseFloat(ausdBalance) ||
+                !engineData ||
+                parseFloat(amount) > parseFloat(engineData.totalDebt || "0")
+              }
             >
               {isLoading ? (
                 <>
@@ -306,7 +533,7 @@ export function MintBurnDeposit() {
               ) : (
                 <>
                   <Flame className="mr-2 h-4 w-4" />
-                  Burn USC
+                  Burn AUSD
                 </>
               )}
             </Button>

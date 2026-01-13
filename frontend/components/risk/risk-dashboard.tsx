@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { useAccount } from "wagmi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -13,87 +14,25 @@ import {
   TrendingDown,
   Activity,
 } from "lucide-react";
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-interface LiquidatableUser {
-  address: string;
-  healthFactor: number;
-  collateralUsd: string;
-  debtUsd: string;
-  liquidationAmount: string;
-}
-
-const mockRiskData = {
-  liquidatableUsers: [
-    {
-      address: "0x1234...5678",
-      healthFactor: 0.95,
-      collateralUsd: "4,200.00",
-      debtUsd: "4,500.00",
-      liquidationAmount: "300.00",
-    },
-    {
-      address: "0xabcd...ef01",
-      healthFactor: 0.88,
-      collateralUsd: "8,500.00",
-      debtUsd: "9,800.00",
-      liquidationAmount: "1,300.00",
-    },
-    {
-      address: "0x9876...fedc",
-      healthFactor: 0.92,
-      collateralUsd: "2,100.00",
-      debtUsd: "2,300.00",
-      liquidationAmount: "200.00",
-    },
-  ],
-  totalCollateral: {
-    value: "125,000,000",
-    breakdown: [
-      {
-        asset: "ETH",
-        amount: "45,000",
-        valueUsd: "85,000,000",
-        percentage: 68,
-      },
-      {
-        asset: "WBTC",
-        amount: "500",
-        valueUsd: "32,000,000",
-        percentage: 25.6,
-      },
-      {
-        asset: "USDC",
-        amount: "8,000,000",
-        valueUsd: "8,000,000",
-        percentage: 6.4,
-      },
-    ],
-  },
-  stableSupply: {
-    total: "75,500,000",
-    circulating: "72,300,000",
-    backing: 165.5,
-  },
-  protocolHealth: {
-    averageHealthFactor: 2.15,
-    usersAtRisk: 42,
-    totalUsers: 12580,
-    collateralizationRatio: 165.5,
-  },
-};
-
-function getHealthColor(hf: number) {
-  if (hf >= 1) return "text-primary";
-  if (hf >= 0.9) return "text-chart-5";
-  return "text-destructive";
-}
+import { ConnectWalletPrompt } from "@/components/connect-wallet-prompt";
+import { mockRiskData } from "@/api/mocks/user";
+import { get, LiquidatableUser, MetricsData } from "@/api/get";
+import { getHealthFactorColor } from "@/domain/healthFactor";
 
 export function RiskDashboard() {
-  const { data, isLoading } = useSWR("/api/risk", fetcher, {
+  const { isConnected } = useAccount();
+  const { data, isLoading } = useSWR("/risk", get<MetricsData>, {
     fallbackData: mockRiskData,
   });
+
+  if (!isConnected) {
+    return (
+      <ConnectWalletPrompt
+        icon={AlertTriangle}
+        description="Connect your wallet to view the risk dashboard"
+      />
+    );
+  }
 
   if (isLoading) {
     return <RiskSkeleton />;
@@ -250,7 +189,7 @@ export function RiskDashboard() {
                   </div>
                   <div className="text-right">
                     <p
-                      className={`font-mono font-bold ${getHealthColor(
+                      className={`font-mono font-bold ${getHealthFactorColor(
                         user.healthFactor
                       )}`}
                     >

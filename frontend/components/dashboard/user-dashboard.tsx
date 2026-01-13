@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { useAccount } from "wagmi";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
@@ -11,55 +12,38 @@ import {
   TrendingUp,
   AlertTriangle,
 } from "lucide-react";
-
-// Fetcher para SWR
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
-
-// Dados mockados para demonstração
-const mockDashboardData = {
-  balances: [
-    { asset: "ETH", amount: "5.25", valueUsd: "12,500.00" },
-    { asset: "WBTC", amount: "0.15", valueUsd: "6,300.00" },
-    { asset: "USC", amount: "8,500.00", valueUsd: "8,500.00" },
-  ],
-  collateral: {
-    total: "18,800.00",
-    locked: "12,000.00",
-    available: "6,800.00",
-  },
-  healthFactor: 1.85,
-  debt: "6,500.00",
-};
-
-function getHealthFactorColor(hf: number) {
-  if (hf >= 2) return "text-primary";
-  if (hf >= 1.5) return "text-chart-3";
-  if (hf >= 1.2) return "text-chart-5";
-  return "text-destructive";
-}
-
-function getHealthFactorStatus(hf: number) {
-  if (hf >= 2) return "Saudável";
-  if (hf >= 1.5) return "Moderado";
-  if (hf >= 1.2) return "Em Risco";
-  return "Crítico";
-}
+import { DashboardData, mockDashboardData } from "@/api/mocks/dashboard";
+import { get } from "@/api/get";
+import {
+  getHealthFactorColor,
+  getHealthFactorStatus,
+  getHealthPercent,
+} from "@/domain/healthFactor";
+import { ConnectWalletPrompt } from "@/components/connect-wallet-prompt";
 
 export function UserDashboard() {
-  const { data, isLoading } = useSWR("/api/dashboard", fetcher, {
+  const { isConnected } = useAccount();
+  const { data, isLoading } = useSWR("/dashboard", get<DashboardData>, {
     fallbackData: mockDashboardData,
   });
+
+  if (!isConnected) {
+    return (
+      <ConnectWalletPrompt
+        icon={AlertTriangle}
+        description="Connect your wallet to view your dashboard"
+      />
+    );
+  }
 
   if (isLoading) {
     return <DashboardSkeleton />;
   }
 
-  const healthPercent = Math.min((data.healthFactor / 3) * 100, 100);
-
   return (
     <div className="space-y-6">
       {/* Main metrics cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <Card className="border-border bg-card">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -88,7 +72,7 @@ export function UserDashboard() {
             <div className="text-2xl font-bold text-foreground">
               ${data.debt}
             </div>
-            <p className="text-xs text-muted-foreground">USC minted</p>
+            <p className="text-xs text-muted-foreground">AUSD minted</p>
           </CardContent>
         </Card>
 
@@ -114,19 +98,6 @@ export function UserDashboard() {
             </p>
           </CardContent>
         </Card>
-
-        <Card className="border-border bg-card">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Liquidation Limit
-            </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-chart-5" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-foreground">$7,800.00</div>
-            <p className="text-xs text-muted-foreground">Price: ETH $1,485</p>
-          </CardContent>
-        </Card>
       </div>
 
       {/*  Visual Health Factor */}
@@ -142,7 +113,10 @@ export function UserDashboard() {
             <span className="text-sm text-muted-foreground">Liquidation</span>
             <span className="text-sm text-muted-foreground">Healthy</span>
           </div>
-          <Progress value={healthPercent} className="h-3" />
+          <Progress
+            value={getHealthPercent(data.healthFactor)}
+            className="h-3"
+          />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
             <span>1.0</span>
             <span>1.5</span>
@@ -158,12 +132,12 @@ export function UserDashboard() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
             <Wallet className="h-5 w-5 text-primary" />
-            Balance by Asset
+            Collateral Amount by Asset
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {data.balances.map(
+            {data.collateralDeposited.map(
               (balance: {
                 asset: string;
                 amount: string;
@@ -176,7 +150,7 @@ export function UserDashboard() {
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                       <span className="font-mono text-lg text-primary">
-                        {balance.asset === "ETH"
+                        {balance.asset === "WETH"
                           ? "Ξ"
                           : balance.asset === "WBTC"
                           ? "₿"
@@ -210,8 +184,8 @@ export function UserDashboard() {
 function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(3)].map((_, i) => (
           <Card key={i} className="border-border bg-card">
             <CardHeader className="pb-2">
               <Skeleton className="h-4 w-24" />
