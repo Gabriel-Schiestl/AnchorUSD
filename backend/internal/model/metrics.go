@@ -1,3 +1,5 @@
 package model
 
-type Metrics struct {}
+type Metrics struct {
+	
+}

@@ -2,16 +2,16 @@ package storage
 
 import (
 	"context"
-	"database/sql"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
+	"gorm.io/gorm"
 )
 
 type metricsStore struct {
-	DB *sql.DB
+	DB *gorm.DB
 }
 
-func NewMetricsStore(db *sql.DB) *metricsStore {
+func NewMetricsStore(db *gorm.DB) *metricsStore {
 	return &metricsStore{
 		DB: db,
 	}
