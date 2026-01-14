@@ -7,7 +7,8 @@ import (
 )
 
 type blockchainConfig struct {
-	ProviderURL string `env:"BLOCKCHAIN_PROVIDER_URL"`
+	ProviderURL     string `env:"BLOCKCHAIN_PROVIDER_URL"`
+	ContractAddress string `env:"CONTRACT_ADDRESS"`
 }
 
 func GetBlockchainConfig() *blockchainConfig {
@@ -21,4 +22,8 @@ func GetBlockchainConfig() *blockchainConfig {
 
 func (bc *blockchainConfig) GetProviderURL() string {
 	return bc.ProviderURL
+}
+
+func (bc *blockchainConfig) GetContractAddress() string {
+	return bc.ContractAddress
 }

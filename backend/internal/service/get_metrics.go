@@ -7,7 +7,7 @@ import (
 )
 
 type MetricsStore interface {
-    Get(ctx context.Context) (*model.Metrics, error)
+	Get(ctx context.Context) (*model.Metrics, error)
 }
 
 type metricsService struct {

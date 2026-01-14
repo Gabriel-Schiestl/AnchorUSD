@@ -26,7 +26,7 @@ func main() {
 	metricsStore := storage.NewMetricsStore(db)
 	metricsService := service.NewMetricsService(metricsStore)
 
-	worker.RunLogWorker(bChainClient)
+	worker.RunLogWorker(bChainClient, bChainConfig, nil)
 	http.RegisterRoutes(metricsService)
 	http.Run(":8080")
 }
