@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func ProcessAUSDMinted(eventName string, log types.Log) {
+func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model.Metrics) {
 	event := decodeAUSDMintedEvent(log)
 	if event == nil {
 		return
@@ -44,7 +44,12 @@ func ProcessAUSDMinted(eventName string, log types.Log) {
 		return
 	}
 
-	//TODO: Add to events queue in order to update user balance etc.
+	metricsChan <- model.Metrics{
+		UserAddress: event.To,
+		Amount: amountDecimal,
+		Asset: model.StablecoinAsset,
+		Operation: model.Addition,
+	}
 }
 
 func decodeAUSDMintedEvent(log types.Log) *model.AUSDMintedEvent {

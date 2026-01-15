@@ -4,6 +4,8 @@ import (
 	"context"
 	"log"
 	"math/big"
+	"os"
+	"strconv"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/service/processors"
@@ -21,7 +23,7 @@ type EventStore interface {
 	GetLastProcessedBlock() (int64, error)
 }
 
-type Processor func(string, types.Log)
+type Processor func(string, types.Log, chan<- model.Metrics)
 
 var Processors = map[string]Processor{
 	"CollateralDeposited": processors.ProcessCollateralDeposited,
@@ -50,8 +52,20 @@ func RunLogWorker(bchainClient *ethclient.Client, bchainConfig BlockchainConfig,
 	if err != nil {
 		panic(err)
 	}
-	
-	go processLogs(logsChan, sub)
+
+	numLogWorkers := os.Getenv("NUM_LOG_WORKERS")
+	if numLogWorkers == "" {
+		numLogWorkers = "4"
+	}
+
+	intNumLogWorkers, err := strconv.Atoi(numLogWorkers)
+	if err != nil {
+		intNumLogWorkers = 4
+	}
+
+	for i := 0; i < intNumLogWorkers; i++ {
+		go processLogs(logsChan, sub)
+	}
 }
 
 func processLogs(logsChan <-chan types.Log, sub ethereum.Subscription) {
@@ -76,7 +90,7 @@ func decodeLog(vLog types.Log) {
 
 func checkProcessorExists(eventName string, vLog types.Log) {
 	if processor, exists := Processors[eventName]; exists {
-		go processor(eventName, vLog)
+		go processor(eventName, vLog, metricsChan)
 	} 
 
 	log.Printf("No processor found for event: %s", eventName)

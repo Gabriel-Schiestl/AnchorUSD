@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func ProcessCollateralRedeemed(eventName string, log types.Log) {
+func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan<- model.Metrics) {
 	event := decodeEventData(log)
 	if event == nil {
 		return
@@ -45,7 +45,12 @@ func ProcessCollateralRedeemed(eventName string, log types.Log) {
 		return
 	}
 
-	//TODO: Add to events queue in order to update user balance etc.
+	metricsChan <- model.Metrics{
+		UserAddress: event.From,
+		Amount: amountDecimal,
+		Asset: model.CollateralAsset,
+		Operation: model.Subtraction,
+	}
 }
 
 func decodeEventData(log types.Log) *model.CollateralRedeemedEvent {

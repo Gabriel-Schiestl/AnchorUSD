@@ -21,12 +21,17 @@ func main() {
 
 	db := config.GetDBInstance()
 	bChainConfig := config.GetBlockchainConfig()
+	cacheConfig := config.GetCacheConfig()
+
 	bChainClient := blockchain.GetClient(bChainConfig)
+	cacheStore := storage.NewCacheStore(cacheConfig)
 
 	metricsStore := storage.NewMetricsStore(db)
 	metricsService := service.NewMetricsService(metricsStore)
 
 	worker.RunLogWorker(bChainClient, bChainConfig, nil)
+	worker.RunMetricsWorker(cacheStore)
+
 	http.RegisterRoutes(metricsService)
 	http.Run(":8080")
 }
