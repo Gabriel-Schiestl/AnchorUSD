@@ -21,6 +21,7 @@ type BlockchainConfig interface {
 
 type EventStore interface {
 	GetLastProcessedBlock() (int64, error)
+	FindOneInBlock(ctx context.Context, logId uint, blockNumber uint64) (*model.Events, error)
 }
 
 type Processor func(string, types.Log, chan<- model.Metrics)
@@ -64,22 +65,26 @@ func RunLogWorker(bchainClient *ethclient.Client, bchainConfig BlockchainConfig,
 	}
 
 	for i := 0; i < intNumLogWorkers; i++ {
-		go processLogs(logsChan, sub)
+		go processLogs(logsChan, sub, eventStore)
 	}
 }
 
-func processLogs(logsChan <-chan types.Log, sub ethereum.Subscription) {
+func processLogs(logsChan <-chan types.Log, sub ethereum.Subscription, eventStore EventStore) {
 	for {
 		select {
 		case err := <-sub.Err():
 			log.Fatal(err)
 		case vLog := <-logsChan:
-			decodeLog(vLog)
+			decodeLog(vLog, eventStore)
 		}
 	}
 }
 
-func decodeLog(vLog types.Log) {
+func decodeLog(vLog types.Log, eventStore EventStore) {
+	if event, _ :=eventStore.FindOneInBlock(context.Background(), vLog.Index, vLog.BlockNumber); event != nil {
+		return
+	}
+ 
 	for _, event := range model.EventsSignatures {
 		if event.MatchesHexSignature(vLog.Topics[0].Hex()) {
 			log.Printf("Matched topic %s", event.GetName())
