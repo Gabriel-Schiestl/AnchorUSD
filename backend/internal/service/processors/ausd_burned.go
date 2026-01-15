@@ -1,5 +1,61 @@
 package processors
 
-import "github.com/ethereum/go-ethereum/core/types"
+import (
+	"context"
+	"math/big"
 
-func ProcessAUSDBurned(log types.Log) {}
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+)
+
+func ProcessAUSDBurned(eventName string, log types.Log) {
+	event := decodeAUSDBurnedEvent(log)
+	if event == nil {
+		return
+	}
+
+	eventModel := &model.Events{
+		BlockNumber: log.BlockNumber,
+		TxHash:      log.TxHash.Hex(),
+		LogIndex:    log.Index,
+		Name:        eventName,
+	}
+
+	err := storage.GetEventsStore().Create(context.Background(), eventModel)
+	if err != nil {
+		return
+	}
+
+	amountDecimal := decimal.NewFromBigInt(event.Amount, 0)
+
+	burn := &model.Burns{
+		ID:          uuid.New().String(),
+		EventID:     eventModel.ID,
+		UserAddress: event.From.Hex(),
+		Amount:      amountDecimal,
+	}
+
+	err = storage.GetCollateralStore().CreateBurn(context.Background(), burn)
+	if err != nil {
+		return
+	}
+
+	//TODO: Add to events queue in order to update user balance etc.
+}
+
+func decodeAUSDBurnedEvent(log types.Log) *model.AUSDBurnedEvent {
+	// AUSDBurned(address,uint256) - address e uint256 são indexed
+	if len(log.Topics) < 3 {
+		return nil
+	}
+
+	event := &model.AUSDBurnedEvent{}
+	event.From = common.HexToAddress(log.Topics[1].Hex())
+	event.Amount = new(big.Int).SetBytes(log.Topics[2].Bytes())
+
+	return event
+}

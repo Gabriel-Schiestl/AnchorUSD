@@ -14,25 +14,25 @@ var EventsSignatures = []*EventSignature{
 	{Name: "AUSDBurned", Signature: "AUSDBurned(address,uint256)"},
 }
 
-type CollateralDeposited struct {
+type CollateralDepositedEvent struct {
 	From  			common.Address
 	TokenAddr 		common.Address
 	Amount 			*big.Int
 }
 
-type CollateralRedeemed struct {
+type CollateralRedeemedEvent struct {
 	From 		common.Address
 	To   		common.Address
 	TokenAddr 	common.Address
 	Amount 		*big.Int
 }
 
-type AUSDMinted struct {
+type AUSDMintedEvent struct {
 	To    	common.Address
 	Amount 	*big.Int
 }
 
-type AUSDBurned struct {
+type AUSDBurnedEvent struct {
 	From  	common.Address
 	Amount 	*big.Int
 }

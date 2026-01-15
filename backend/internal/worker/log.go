@@ -21,7 +21,7 @@ type EventStore interface {
 	GetLastProcessedBlock() (int64, error)
 }
 
-type Processor func(types.Log)
+type Processor func(string, types.Log)
 
 var Processors = map[string]Processor{
 	"CollateralDeposited": processors.ProcessCollateralDeposited,
@@ -76,7 +76,7 @@ func decodeLog(vLog types.Log) {
 
 func checkProcessorExists(eventName string, vLog types.Log) {
 	if processor, exists := Processors[eventName]; exists {
-		go processor(vLog)
+		go processor(eventName, vLog)
 	} 
 
 	log.Printf("No processor found for event: %s", eventName)
