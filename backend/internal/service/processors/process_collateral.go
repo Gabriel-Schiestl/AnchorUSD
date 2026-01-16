@@ -68,20 +68,23 @@ func getCollateralUSDAmount(metric model.Metrics, priceFeed external.IPriceFeedA
 		tokenAmountBigInt := big.NewInt(0)
 		tokenAmountBigInt.SetString(tokenAmount, 10)
 
-		tokenAmountInUSD := domain.GetTokenAmountInUSD(tokenAmountBigInt, price)
+		tokenAmountInUSD, err := domain.GetTokenAmountInUSD(tokenAmountBigInt, price)
+		if err != nil {
+			return nil, err
+		}
 		totalUSDValue = big.NewInt(0).Add(totalUSDValue, tokenAmountInUSD)
 	}
 
 	return totalUSDValue, nil
 }
 
-func getPrice(priceFeed external.IPriceFeedAPI, name string) (float64, error) {
+func getPrice(priceFeed external.IPriceFeedAPI, name string) (string, error) {
 	switch name {
 	case "ETH":
 		return priceFeed.GetEthUsdPrice()
 	case "BTC":
 		return priceFeed.GetBtcUsdPrice()
 	default:
-		return 0, nil
+		return "0", nil
 	}
 }

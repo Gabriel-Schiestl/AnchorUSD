@@ -3,8 +3,8 @@ package external
 import "os"
 
 type IPriceFeedAPI interface {
-	GetEthUsdPrice() (float64, error)
-	GetBtcUsdPrice() (float64, error)
+	GetEthUsdPrice() (string, error)
+	GetBtcUsdPrice() (string, error)
 }
 
 type PriceFeedAPI struct {
@@ -18,13 +18,13 @@ func NewPriceFeedAPI() *PriceFeedAPI {
 }
 
 //TODO: implement falling back to another price feed if the primary fails
-func (pfa *PriceFeedAPI) GetEthUsdPrice() (float64, error) {
+func (pfa *PriceFeedAPI) GetEthUsdPrice() (string, error) {
 	// Implementation to call the external price feed API and retrieve the ETH/USD price
-	return 0, nil
+	return "", nil
 }
 
-func (pfa *PriceFeedAPI) GetBtcUsdPrice() (float64, error) {
+func (pfa *PriceFeedAPI) GetBtcUsdPrice() (string, error) {
 	// Implementation to call the external price feed API and retrieve the BTC/USD price
-	return 0, nil
+	return "", nil
 }
 
