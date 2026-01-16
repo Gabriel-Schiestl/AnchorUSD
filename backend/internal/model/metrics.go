@@ -22,4 +22,5 @@ type Metrics struct {
 	Amount      *big.Int
 	Asset       Asset
 	Operation   Operation
+	CollateralTokenAddress common.Address
 }

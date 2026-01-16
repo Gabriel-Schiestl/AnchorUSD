@@ -6,6 +6,7 @@ import (
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/blockchain"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/config"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/http"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/http/external"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/service"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/worker"
@@ -29,8 +30,10 @@ func main() {
 	metricsStore := storage.NewMetricsStore(db)
 	metricsService := service.NewMetricsService(metricsStore)
 
+	priceFeed := external.NewPriceFeedAPI()
+
 	worker.RunLogWorker(bChainClient, bChainConfig, nil)
-	worker.RunMetricsWorker(cacheStore)
+	worker.RunMetricsWorker(cacheStore, priceFeed)
 
 	http.RegisterRoutes(metricsService)
 	http.Run(":8080")
