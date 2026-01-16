@@ -81,7 +81,7 @@ func processLogs(logsChan <-chan types.Log, sub ethereum.Subscription, eventStor
 }
 
 func decodeLog(vLog types.Log, eventStore EventStore) {
-	if event, _ :=eventStore.FindOneInBlock(context.Background(), vLog.Index, vLog.BlockNumber); event != nil {
+	if event, _ := eventStore.FindOneInBlock(context.Background(), vLog.Index, vLog.BlockNumber); event != nil {
 		return
 	}
  

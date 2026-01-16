@@ -1,8 +1,9 @@
 package model
 
 import (
+	"math/big"
+
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/shopspring/decimal"
 )
 
 type Asset string
@@ -18,7 +19,7 @@ const (
 
 type Metrics struct {
 	UserAddress common.Address
-	Amount      decimal.Decimal
+	Amount      *big.Int
 	Asset       Asset
 	Operation   Operation
 }

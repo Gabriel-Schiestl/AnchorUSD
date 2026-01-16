@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model.Metrics) {
@@ -30,13 +29,11 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 		return
 	}
 
-	amountDecimal := decimal.NewFromBigInt(event.Amount, 0)
-
 	burn := &model.Burns{
 		ID:          uuid.New().String(),
 		EventID:     eventModel.ID,
 		UserAddress: event.From.Hex(),
-		Amount:      amountDecimal,
+		Amount:      event.Amount,
 	}
 
 	err = storage.GetCollateralStore().CreateBurn(context.Background(), burn)
@@ -46,7 +43,7 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 
 	metricsChan <- model.Metrics{
 		UserAddress: event.From,
-		Amount: amountDecimal,
+		Amount: event.Amount,
 		Asset: model.StablecoinAsset,
 		Operation: model.Subtraction,
 	}

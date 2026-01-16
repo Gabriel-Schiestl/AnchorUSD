@@ -1,10 +1,12 @@
 package model
 
-import "github.com/shopspring/decimal"
+import (
+	"math/big"
+)
 
 type Burns struct {
 	ID          string          `json:"id" gorm:"primaryKey"`
 	EventID     uint            `json:"event_id" gorm:"event_id"`
 	UserAddress string          `json:"user_address" gorm:"user_address"`
-	Amount      decimal.Decimal `json:"amount" gorm:"type:decimal(78,0);amount"`
+	Amount      *big.Int 		`json:"amount" gorm:"amount"`
 }

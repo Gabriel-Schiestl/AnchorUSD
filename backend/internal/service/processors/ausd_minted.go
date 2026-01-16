@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model.Metrics) {
@@ -30,13 +29,11 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 		return
 	}
 
-	amountDecimal := decimal.NewFromBigInt(event.Amount, 0)
-
 	mint := &model.Mints{
 		ID:          uuid.New().String(),
 		EventID:     eventModel.ID,
 		UserAddress: event.To.Hex(),
-		Amount:      amountDecimal,
+		Amount:      event.Amount,
 	}
 
 	err = storage.GetCollateralStore().CreateMint(context.Background(), mint)
@@ -46,7 +43,7 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 
 	metricsChan <- model.Metrics{
 		UserAddress: event.To,
-		Amount: amountDecimal,
+		Amount: event.Amount,
 		Asset: model.StablecoinAsset,
 		Operation: model.Addition,
 	}

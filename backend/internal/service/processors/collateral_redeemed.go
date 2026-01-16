@@ -9,7 +9,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 )
 
 func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan<- model.Metrics) {
@@ -30,14 +29,12 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 		return
 	}
 
-	amountDecimal := decimal.NewFromBigInt(event.Amount, 0)
-
 	collateral := &model.Redeem{
 		ID:                uuid.New().String(),
 		EventID:           eventModel.ID,
 		UserAddress:       event.From.Hex(),
 		CollateralAddress: event.TokenAddr.Hex(),
-		Amount:            amountDecimal,
+		Amount:            event.Amount,
 	}
 
 	err = storage.GetCollateralStore().CreateRedeem(context.Background(), collateral)
@@ -47,7 +44,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 
 	metricsChan <- model.Metrics{
 		UserAddress: event.From,
-		Amount: amountDecimal,
+		Amount: event.Amount,
 		Asset: model.CollateralAsset,
 		Operation: model.Subtraction,
 	}
