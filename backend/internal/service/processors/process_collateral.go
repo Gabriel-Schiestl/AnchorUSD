@@ -10,22 +10,16 @@ import (
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 )
 
-var collateralKeysToChange = []string{
-	"collateral:total_supply",
-	"user:collateral",
-}
-
-func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI) {
+func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) {
 	amountToChange := getAmountChange(metric)
 
-	collateralKeysWithUserAddress := make([]string, len(collateralKeysToChange))
-	copy(collateralKeysWithUserAddress, collateralKeysToChange)
+	cacheStore.Add("collateral:total_supply", amountToChange)
 
-	collateralKeysWithUserAddress[1] = collateralKeysWithUserAddress[1] + ":" + metric.UserAddress.Hex() + ":" + metric.CollateralTokenAddress.Hex()
+	collateralKey := "collateral:" + metric.CollateralTokenAddress.Hex()
 
-	cacheStore.MultiAdd(collateralKeysWithUserAddress, amountToChange)
+	cacheStore.HAdd(collateralKey, metric.UserAddress.Hex(), amountToChange)
 
-	getCollateralUSDAmount, err := getCollateralUSDAmount(metric, priceFeed, cacheStore)
+	getCollateralUSDAmount, err := getCollateralUSDAmount(metric, priceFeed, priceStore, cacheStore)
 	if err != nil {
 		return
 	}
@@ -52,15 +46,16 @@ func getAmountChange(metric model.Metrics) *big.Int {
 	return amountToChange
 }
 
-func getCollateralUSDAmount(metric model.Metrics, priceFeed external.IPriceFeedAPI, cacheStore storage.ICacheStore) (*big.Int, error) {
+func getCollateralUSDAmount(metric model.Metrics, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore, cacheStore storage.ICacheStore) (*big.Int, error) {
 	var totalUSDValue = big.NewInt(0)
 	for name, token := range constants.CollateralTokens {
-		price, err := getPrice(priceFeed, name)
+		price, err := getPrice(priceFeed, name, metric.BlockNumber, priceStore)
 		if err != nil {
 			return nil, err
 		}
 
-		tokenAmount, err := cacheStore.Get("user:collateral:" + metric.UserAddress.Hex() + ":" + token)
+		collateralKey := "collateral:" + token
+		tokenAmount, err := cacheStore.HGet(collateralKey, metric.UserAddress.Hex())
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +73,12 @@ func getCollateralUSDAmount(metric model.Metrics, priceFeed external.IPriceFeedA
 	return totalUSDValue, nil
 }
 
-func getPrice(priceFeed external.IPriceFeedAPI, name string) (string, error) {
+func getPrice(priceFeed external.IPriceFeedAPI, name string, blockNumber uint64, priceStore storage.IPriceStore) (string, error) {
+	price, _ := priceStore.GetPriceInBlock(name, blockNumber)
+	if price != nil {
+		return *price, nil
+	}
+
 	switch name {
 	case "ETH":
 		return priceFeed.GetEthUsdPrice()

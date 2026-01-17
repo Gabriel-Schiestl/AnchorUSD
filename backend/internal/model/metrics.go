@@ -23,4 +23,5 @@ type Metrics struct {
 	Asset       Asset
 	Operation   Operation
 	CollateralTokenAddress common.Address
+	BlockNumber uint64
 }

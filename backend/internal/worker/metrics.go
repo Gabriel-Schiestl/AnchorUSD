@@ -20,7 +20,7 @@ func init() {
 	metricsChan = make(chan model.Metrics, 500)
 }
 
-func RunMetricsWorker(cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI) {
+func RunMetricsWorker(cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) {
 	numLogWorkers := os.Getenv("NUM_LOG_WORKERS")
 	if numLogWorkers == "" {
 		numLogWorkers = "4"
@@ -33,15 +33,15 @@ func RunMetricsWorker(cacheStore storage.ICacheStore, priceFeed external.IPriceF
 
 	for i := 0; i < intNumLogWorkers; i++ {
 		mp := &metricsProcessor{cacheStore: cacheStore}
-		go mp.process(cacheStore, priceFeed)
+		go mp.process(cacheStore, priceFeed, priceStore)
 	}
 }
 
-func (mp *metricsProcessor) process(cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI) {
+func (mp *metricsProcessor) process(cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) {
 	for metric := range metricsChan {
 		switch metric.Asset {
 		case model.CollateralAsset:
-			processors.ProcessCollateral(metric, cacheStore, priceFeed)
+			processors.ProcessCollateral(metric, cacheStore, priceFeed, priceStore)
 		case model.StablecoinAsset:
 			processors.ProcessCoin(metric, cacheStore)
 		}

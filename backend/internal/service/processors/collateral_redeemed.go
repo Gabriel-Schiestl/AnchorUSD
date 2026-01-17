@@ -47,6 +47,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 		Amount: event.Amount,
 		Asset: model.CollateralAsset,
 		Operation: model.Subtraction,
+		BlockNumber: eventModel.BlockNumber,
 	}
 }
 
@@ -65,7 +66,6 @@ func decodeEventData(log types.Log) *model.CollateralRedeemedEvent {
 
 	event.From = common.HexToAddress(log.Topics[1].Hex())
 	event.To = common.HexToAddress(log.Topics[2].Hex())
-	event.TokenAddr = common.HexToAddress(log.Topics[3].Hex())
 
 	return event
 }

@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"math/big"
 	"sync"
 	"time"
@@ -12,6 +13,14 @@ var multiAddScript = redis.NewScript(`
 	for i = 1, #KEYS do
 		redis.call("INCRBY", KEYS[i], ARGV[1])
 	end
+`)
+
+var hIncrByBigIntScript = redis.NewScript(`
+	return redis.call("HINCRBY", KEYS[1], ARGV[1], ARGV[2])
+`)
+
+var incrByBigIntScript = redis.NewScript(`
+	return redis.call("INCRBY", KEYS[1], ARGV[1])
 `)
 
 type CacheConfig interface {
@@ -27,9 +36,11 @@ type CacheStore struct {
 type ICacheStore interface {
 	Get(key string) (string, error)
 	Set(key string, value any, expiration time.Duration) (string, error)
-	Increment(key string, amountInWei *big.Int) (int64 , error)
-	Decrement(key string, amountInWei *big.Int) (int64 , error)
+	Add(key string, amountInWei *big.Int) (*big.Int, error)
 	MultiAdd(keys []string, amountInWei *big.Int) error
+	HSet(key string, field string, value any) error
+	HGet(key string, field string) (string, error)
+	HAdd(key string, field string, amountInWei *big.Int) (*big.Int, error)
 }
 
 func NewCacheStore(config CacheConfig) *CacheStore {
@@ -42,32 +53,47 @@ func NewCacheStore(config CacheConfig) *CacheStore {
 }
 
 func (cs *CacheStore) Get(key string) (string, error) {
-	cs.mu.RLock()
-	defer cs.mu.RUnlock()
 	return cs.Client.Get(key).Result()
 }
 
 func (cs *CacheStore) Set(key string, value any, expiration time.Duration) (string, error) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
 	return cs.Client.Set(key, value, expiration).Result()
 }
 
-func (cs *CacheStore) Increment(key string, amountInWei *big.Int) (int64 , error) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	return cs.Client.IncrBy(key, amountInWei.Int64()).Result()
-}
+func (cs *CacheStore) Add(
+	key string,
+	amountInWei *big.Int,
+) (*big.Int, error) {
 
-func (cs *CacheStore) Decrement(key string, amountInWei *big.Int) (int64 , error) {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
-	return cs.Client.DecrBy(key, amountInWei.Int64()).Result()
+	if amountInWei.Sign() == 0 {
+		return big.NewInt(0), nil
+	}
+
+	res, err := incrByBigIntScript.Run(
+		cs.Client,
+		[]string{key},
+		amountInWei.String(),
+	).Result()
+
+	if err != nil {
+		return nil, err
+	}
+
+	switch v := res.(type) {
+	case int64:
+		return big.NewInt(v), nil
+	case string:
+		n, ok := new(big.Int).SetString(v, 10)
+		if !ok {
+			return nil, errors.New("invalid bigint returned from redis")
+		}
+		return n, nil
+	default:
+		return nil, errors.New("unexpected redis return type")
+	}
 }
 
 func (cs *CacheStore) MultiAdd(keys []string, amountInWei *big.Int) error {
-	cs.mu.Lock()
-	defer cs.mu.Unlock()
 	if amountInWei.Sign() == 0 {
 		return nil
 	}
@@ -79,4 +105,43 @@ func (cs *CacheStore) MultiAdd(keys []string, amountInWei *big.Int) error {
 	).Result()
 
 	return err
+}
+
+func (cs *CacheStore) HSet(key string, field string, value any) error {
+	return cs.Client.HSet(key, field, value).Err()
+}
+
+func (cs *CacheStore) HGet(key string, field string) (string, error) {
+	return cs.Client.HGet(key, field).Result()
+}
+
+func (cs *CacheStore) HAdd(
+	key string,
+	field string,
+	amountInWei *big.Int,
+) (*big.Int, error) {
+
+	res, err := hIncrByBigIntScript.Run(
+		cs.Client,
+		[]string{key},
+		field,
+		amountInWei.String(),
+	).Result()
+
+	if err != nil {
+		return nil, err
+	}
+
+	switch v := res.(type) {
+	case int64:
+		return big.NewInt(v), nil
+	case string:
+		n, ok := new(big.Int).SetString(v, 10)
+		if !ok {
+			return nil, errors.New("invalid bigint returned from redis")
+		}
+		return n, nil
+	default:
+		return nil, errors.New("unexpected redis return type")
+	}
 }

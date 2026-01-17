@@ -30,10 +30,12 @@ func main() {
 	metricsStore := storage.NewMetricsStore(db)
 	metricsService := service.NewMetricsService(metricsStore)
 
+	priceStore := storage.NewPriceStore(db)
+
 	priceFeed := external.NewPriceFeedAPI()
 
 	worker.RunLogWorker(bChainClient, bChainConfig, nil)
-	worker.RunMetricsWorker(cacheStore, priceFeed)
+	worker.RunMetricsWorker(cacheStore, priceFeed, priceStore)
 
 	http.RegisterRoutes(metricsService)
 	http.Run(":8080")

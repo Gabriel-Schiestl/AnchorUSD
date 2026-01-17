@@ -47,6 +47,7 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 		Amount: event.Amount,
 		Asset: model.CollateralAsset,
 		Operation: model.Addition,
+		BlockNumber: eventModel.BlockNumber,
 	}
 }
 

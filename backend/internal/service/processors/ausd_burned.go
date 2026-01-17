@@ -46,6 +46,7 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 		Amount: event.Amount,
 		Asset: model.StablecoinAsset,
 		Operation: model.Subtraction,
+		BlockNumber: eventModel.BlockNumber,
 	}
 }
 
