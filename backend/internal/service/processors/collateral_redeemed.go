@@ -19,9 +19,9 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 
 	eventModel := &model.Events{
 		BlockNumber: log.BlockNumber,
-		TxHash: log.TxHash.Hex(),
-		LogIndex: log.Index,
-		Name: eventName,
+		TxHash:      log.TxHash.Hex(),
+		LogIndex:    log.Index,
+		Name:        eventName,
 	}
 
 	err := storage.GetEventsStore().Create(context.Background(), eventModel)
@@ -44,9 +44,9 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 
 	metricsChan <- model.Metrics{
 		UserAddress: event.From,
-		Amount: event.Amount,
-		Asset: model.CollateralAsset,
-		Operation: model.Subtraction,
+		Amount:      event.Amount,
+		Asset:       model.CollateralAsset,
+		Operation:   model.Subtraction,
 		BlockNumber: eventModel.BlockNumber,
 	}
 }

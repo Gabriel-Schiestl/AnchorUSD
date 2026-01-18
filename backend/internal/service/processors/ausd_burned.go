@@ -36,16 +36,16 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 		Amount:      event.Amount,
 	}
 
-	err = storage.GetCollateralStore().CreateBurn(context.Background(), burn)
+	err = storage.GetCoinStore().CreateBurn(context.Background(), burn)
 	if err != nil {
 		return
 	}
 
 	metricsChan <- model.Metrics{
 		UserAddress: event.From,
-		Amount: event.Amount,
-		Asset: model.StablecoinAsset,
-		Operation: model.Subtraction,
+		Amount:      event.Amount,
+		Asset:       model.StablecoinAsset,
+		Operation:   model.Subtraction,
 		BlockNumber: eventModel.BlockNumber,
 	}
 }

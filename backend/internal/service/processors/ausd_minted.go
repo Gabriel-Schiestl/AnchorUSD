@@ -36,16 +36,16 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 		Amount:      event.Amount,
 	}
 
-	err = storage.GetCollateralStore().CreateMint(context.Background(), mint)
+	err = storage.GetCoinStore().CreateMint(context.Background(), mint)
 	if err != nil {
 		return
 	}
 
 	metricsChan <- model.Metrics{
 		UserAddress: event.To,
-		Amount: event.Amount,
-		Asset: model.StablecoinAsset,
-		Operation: model.Addition,
+		Amount:      event.Amount,
+		Asset:       model.StablecoinAsset,
+		Operation:   model.Addition,
 		BlockNumber: eventModel.BlockNumber,
 	}
 }

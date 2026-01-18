@@ -13,8 +13,6 @@ import (
 func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) {
 	amountToChange := getAmountChange(metric)
 
-	cacheStore.Add("collateral:total_supply", amountToChange)
-
 	collateralKey := "collateral:" + metric.CollateralTokenAddress.Hex()
 
 	cacheStore.HAdd(collateralKey, metric.UserAddress.Hex(), amountToChange)
@@ -29,19 +27,51 @@ func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, pri
 		return
 	}
 
+	usdAmountToChange, err := getUSDAmountToChange(metric, priceFeed, priceStore)
+	if err != nil {
+		return
+	}
+
 	debtBigInt := big.NewInt(0)
 	debtBigInt.SetString(debt, 10)
 
 	healthFactor := domain.CalculateHealthFactor(getCollateralUSDAmount, debtBigInt)
 
+	cacheStore.Add("collateral:total_supply", usdAmountToChange)
 	cacheStore.Set("user:collateral_usd:"+metric.UserAddress.Hex(), getCollateralUSDAmount.String(), 0)
 	cacheStore.Set("user:health_factor:"+metric.UserAddress.Hex(), healthFactor.String(), 0)
+}
+
+func getUSDAmountToChange(metric model.Metrics, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) (*big.Int, error) {
+	var name string
+	for tokenName, tokenAddress := range constants.CollateralTokens {
+		if tokenAddress == metric.CollateralTokenAddress.Hex() {
+			name = tokenName
+			break
+		}
+	}
+
+	price, err := getPrice(priceFeed, name, metric.BlockNumber, priceStore)
+	if err != nil {
+		return nil, err
+	}
+
+	usdAmount, err := domain.GetTokenAmountInUSD(metric.Amount, price)
+	if err != nil {
+		return nil, err
+	}
+
+	if metric.Operation == model.Subtraction {
+		usdAmount = big.NewInt(0).Neg(usdAmount)
+	}
+
+	return usdAmount, nil
 }
 
 func getAmountChange(metric model.Metrics) *big.Int {
 	amountToChange := metric.Amount
 	if metric.Operation == model.Subtraction {
-		amountToChange = big.NewInt(0).Neg(amountToChange) 
+		amountToChange = big.NewInt(0).Neg(amountToChange)
 	}
 	return amountToChange
 }
@@ -79,12 +109,21 @@ func getPrice(priceFeed external.IPriceFeedAPI, name string, blockNumber uint64,
 		return *price, nil
 	}
 
+	result := "0"
+	var err error
+
 	switch name {
 	case "ETH":
-		return priceFeed.GetEthUsdPrice()
+		result, err = priceFeed.GetEthUsdPrice()
 	case "BTC":
-		return priceFeed.GetBtcUsdPrice()
+		result, err = priceFeed.GetBtcUsdPrice()
 	default:
-		return "0", nil
 	}
+
+	errSave := priceStore.SavePriceInBlock(name, blockNumber, result)
+	if errSave != nil {
+		return "", errSave
+	}
+
+	return result, err
 }

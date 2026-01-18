@@ -6,11 +6,9 @@ import (
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model/constants"
 )
 
-
-
 func CalculateHealthFactor(collateralValueUSD, debtValueUSD *big.Int) *big.Int {
 	if debtValueUSD.Sign() == 0 {
-		return big.NewInt(0).Set(constants.PRECISION) 
+		return big.NewInt(0).Set(constants.PRECISION)
 	}
 
 	collateralAdjusted := big.NewInt(0).Mul(collateralValueUSD, constants.LIQUIDATION_THRESHOLD)

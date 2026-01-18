@@ -28,9 +28,9 @@ type Processor func(string, types.Log, chan<- model.Metrics)
 
 var Processors = map[string]Processor{
 	"CollateralDeposited": processors.ProcessCollateralDeposited,
-	"AUSDMinted":         processors.ProcessAUSDMinted,
-	"AUSDBurned":         processors.ProcessAUSDBurned,
-	"CollateralRedeemed": processors.ProcessCollateralRedeemed,
+	"AUSDMinted":          processors.ProcessAUSDMinted,
+	"AUSDBurned":          processors.ProcessAUSDBurned,
+	"CollateralRedeemed":  processors.ProcessCollateralRedeemed,
 }
 
 func RunLogWorker(bchainClient *ethclient.Client, bchainConfig BlockchainConfig, eventStore EventStore) {
@@ -84,19 +84,19 @@ func decodeLog(vLog types.Log, eventStore EventStore) {
 	if event, _ := eventStore.FindOneInBlock(context.Background(), vLog.Index, vLog.BlockNumber); event != nil {
 		return
 	}
- 
+
 	for _, event := range model.EventsSignatures {
 		if event.MatchesHexSignature(vLog.Topics[0].Hex()) {
 			log.Printf("Matched topic %s", event.GetName())
 			checkProcessorExists(event.GetName(), vLog)
 		}
-	} 
+	}
 }
 
 func checkProcessorExists(eventName string, vLog types.Log) {
 	if processor, exists := Processors[eventName]; exists {
 		go processor(eventName, vLog, metricsChan)
-	} 
+	}
 
 	log.Printf("No processor found for event: %s", eventName)
 }

@@ -44,9 +44,9 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 
 	metricsChan <- model.Metrics{
 		UserAddress: event.From,
-		Amount: event.Amount,
-		Asset: model.CollateralAsset,
-		Operation: model.Addition,
+		Amount:      event.Amount,
+		Asset:       model.CollateralAsset,
+		Operation:   model.Addition,
 		BlockNumber: eventModel.BlockNumber,
 	}
 }

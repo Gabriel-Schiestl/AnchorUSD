@@ -37,6 +37,8 @@ func main() {
 	worker.RunLogWorker(bChainClient, bChainConfig, nil)
 	worker.RunMetricsWorker(cacheStore, priceFeed, priceStore)
 
+	service.UpdateMetrics(cacheStore, priceFeed)
+
 	http.RegisterRoutes(metricsService)
 	http.Run(":8080")
 }

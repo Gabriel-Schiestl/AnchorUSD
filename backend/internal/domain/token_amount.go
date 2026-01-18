@@ -10,7 +10,7 @@ import (
 
 func GetTokenAmountInUSD(
 	amountInWei *big.Int,
-	tokenPriceUSD string, 
+	tokenPriceUSD string,
 ) (*big.Int, error) {
 
 	priceScaled, ok := ParseDecimalToScaledInt(tokenPriceUSD, constants.PRICE_PRECISION)

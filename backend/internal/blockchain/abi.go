@@ -9,30 +9,29 @@ import (
 var contractABI *abi.ABI
 
 func loadABI() (*abi.ABI, error) {
-    f, err := os.Open("../../AUSDEngine.abi.json")
-    if err != nil {
-        return nil, err
-    }
-    defer f.Close()
+	f, err := os.Open("../../AUSDEngine.abi.json")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
 
-    parsedABI, err := abi.JSON(f)
-    if err != nil {
-        return nil, err
-    }
+	parsedABI, err := abi.JSON(f)
+	if err != nil {
+		return nil, err
+	}
 
-    return &parsedABI, nil
+	return &parsedABI, nil
 }
 
 func GetABI() (*abi.ABI, error) {
-    if contractABI != nil {
-        return contractABI, nil
-    }
+	if contractABI != nil {
+		return contractABI, nil
+	}
 
-    contractABI, err := loadABI()
-    if err != nil {
-        return nil, err
-    }
-    
-    return contractABI, nil
+	contractABI, err := loadABI()
+	if err != nil {
+		return nil, err
+	}
+
+	return contractABI, nil
 }
-

@@ -17,7 +17,7 @@ func NewPriceFeedAPI() *PriceFeedAPI {
 	}
 }
 
-//TODO: implement falling back to another price feed if the primary fails
+// TODO: implement falling back to another price feed if the primary fails
 func (pfa *PriceFeedAPI) GetEthUsdPrice() (string, error) {
 	// Implementation to call the external price feed API and retrieve the ETH/USD price
 	return "", nil
@@ -27,4 +27,3 @@ func (pfa *PriceFeedAPI) GetBtcUsdPrice() (string, error) {
 	// Implementation to call the external price feed API and retrieve the BTC/USD price
 	return "", nil
 }
-

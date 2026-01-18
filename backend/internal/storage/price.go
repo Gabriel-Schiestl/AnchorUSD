@@ -7,6 +7,7 @@ import (
 
 type IPriceStore interface {
 	GetPriceInBlock(tokenAddress string, blockNumber uint64) (*string, error)
+	SavePriceInBlock(tokenAddress string, blockNumber uint64, priceInUSD string) error
 }
 
 var priceStr priceStore
@@ -35,4 +36,14 @@ func (s *priceStore) GetPriceInBlock(tokenName string, blockNumber uint64) (*str
 		return nil, result.Error
 	}
 	return &price.PriceInUSD, nil
+}
+
+func (s *priceStore) SavePriceInBlock(tokenName string, blockNumber uint64, priceInUSD string) error {
+	price := model.Prices{
+		TokenName:   tokenName,
+		BlockNumber: blockNumber,
+		PriceInUSD:  priceInUSD,
+	}
+	result := s.DB.Create(&price)
+	return result.Error
 }

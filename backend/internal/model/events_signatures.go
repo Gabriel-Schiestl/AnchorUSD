@@ -15,26 +15,26 @@ var EventsSignatures = []*EventSignature{
 }
 
 type CollateralDepositedEvent struct {
-	From  			common.Address
-	TokenAddr 		common.Address
-	Amount 			*big.Int
+	From      common.Address
+	TokenAddr common.Address
+	Amount    *big.Int
 }
 
 type CollateralRedeemedEvent struct {
-	From 		common.Address
-	To   		common.Address
-	TokenAddr 	common.Address
-	Amount 		*big.Int
+	From      common.Address
+	To        common.Address
+	TokenAddr common.Address
+	Amount    *big.Int
 }
 
 type AUSDMintedEvent struct {
-	To    	common.Address
-	Amount 	*big.Int
+	To     common.Address
+	Amount *big.Int
 }
 
 type AUSDBurnedEvent struct {
-	From  	common.Address
-	Amount 	*big.Int
+	From   common.Address
+	Amount *big.Int
 }
 
 type EventSignature struct {

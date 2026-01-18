@@ -30,7 +30,7 @@ type CacheConfig interface {
 
 type CacheStore struct {
 	Client *redis.Client
-	mu sync.RWMutex
+	mu     sync.RWMutex
 }
 
 type ICacheStore interface {
@@ -46,7 +46,7 @@ type ICacheStore interface {
 func NewCacheStore(config CacheConfig) *CacheStore {
 	return &CacheStore{
 		Client: redis.NewClient(&redis.Options{
-			Addr: config.GetAddress(),
+			Addr:     config.GetAddress(),
 			Password: config.GetPassword(),
 		}),
 	}
