@@ -11,9 +11,8 @@ import (
 func ProcessCoin(metric model.Metrics, cacheStore storage.ICacheStore) {
 	amountToChange := getAmountChange(metric)
 
-
 	cacheStore.HAdd("coin", "total_supply", amountToChange)
-	
+
 	cacheStore.HAdd("user:debt", metric.UserAddress.Hex(), amountToChange)
 
 	collateralUSDValue, err := cacheStore.HGet("user:collateral_usd", metric.UserAddress.Hex())

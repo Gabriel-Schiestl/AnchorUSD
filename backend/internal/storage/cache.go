@@ -41,6 +41,9 @@ type ICacheStore interface {
 	HSet(key string, field string, value any) error
 	HGet(key string, field string) (string, error)
 	HAdd(key string, field string, amountInWei *big.Int) (*big.Int, error)
+	HGetAll(key string) (map[string]string, error)
+	SSet(key string, members ...string) error
+	SGetAll(key string) ([]string, error)
 }
 
 func NewCacheStore(config CacheConfig) *CacheStore {
@@ -148,4 +151,12 @@ func (cs *CacheStore) HAdd(
 
 func (cs *CacheStore) HGetAll(key string) (map[string]string, error) {
 	return cs.Client.HGetAll(key).Result()
+}
+
+func (cs *CacheStore) SSet(key string, members ...string) error {
+	return cs.Client.SAdd(key, members).Err()
+}
+
+func (cs *CacheStore) SGetAll(key string) ([]string, error) {
+	return cs.Client.SMembers(key).Result()
 }

@@ -36,6 +36,7 @@ func main() {
 
 	worker.RunLogWorker(bChainClient, bChainConfig, nil)
 	worker.RunMetricsWorker(cacheStore, priceFeed, priceStore)
+	worker.RunLiquidationsWorker(cacheStore, priceFeed)
 
 	service.UpdateMetrics(cacheStore, priceFeed)
 
