@@ -8,27 +8,20 @@ import (
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 )
 
-var coinKeysToChange = []string{
-	"coin:total_supply",
-	"user:debt",
-}
-
 func ProcessCoin(metric model.Metrics, cacheStore storage.ICacheStore) {
 	amountToChange := getAmountChange(metric)
 
-	coinKeysWithUserAddress := make([]string, len(coinKeysToChange))
-	copy(coinKeysWithUserAddress, coinKeysToChange)
 
-	coinKeysWithUserAddress[1] = coinKeysWithUserAddress[1] + ":" + metric.UserAddress.Hex()
+	cacheStore.HAdd("coin", "total_supply", amountToChange)
+	
+	cacheStore.HAdd("user:debt", metric.UserAddress.Hex(), amountToChange)
 
-	cacheStore.MultiAdd(coinKeysWithUserAddress, amountToChange)
-
-	collateralUSDValue, err := cacheStore.Get("user:collateral_usd:" + metric.UserAddress.Hex())
+	collateralUSDValue, err := cacheStore.HGet("user:collateral_usd", metric.UserAddress.Hex())
 	if err != nil {
 		return
 	}
 
-	debt, err := cacheStore.Get("user:debt:" + metric.UserAddress.Hex())
+	debt, err := cacheStore.HGet("user:debt", metric.UserAddress.Hex())
 	if err != nil {
 		return
 	}
@@ -41,5 +34,5 @@ func ProcessCoin(metric model.Metrics, cacheStore storage.ICacheStore) {
 
 	healthFactor := domain.CalculateHealthFactor(collateralUSDBigInt, debtBigInt)
 
-	cacheStore.Set("user:health_factor:"+metric.UserAddress.Hex(), healthFactor.String(), 0)
+	cacheStore.HSet("user:health_factor", metric.UserAddress.Hex(), healthFactor.String())
 }

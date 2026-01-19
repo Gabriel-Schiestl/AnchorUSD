@@ -145,3 +145,7 @@ func (cs *CacheStore) HAdd(
 		return nil, errors.New("unexpected redis return type")
 	}
 }
+
+func (cs *CacheStore) HGetAll(key string) (map[string]string, error) {
+	return cs.Client.HGetAll(key).Result()
+}

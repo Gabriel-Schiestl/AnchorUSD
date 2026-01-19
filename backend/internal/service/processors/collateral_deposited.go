@@ -52,7 +52,6 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 }
 
 func decodeCollateralDepositedEvent(log types.Log) *model.CollateralDepositedEvent {
-	// CollateralDeposited(address,address,uint256) - todos são indexed
 	if len(log.Topics) < 4 {
 		return nil
 	}

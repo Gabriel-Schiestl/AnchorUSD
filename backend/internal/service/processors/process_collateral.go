@@ -22,7 +22,7 @@ func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, pri
 		return
 	}
 
-	debt, err := cacheStore.Get("user:debt:" + metric.UserAddress.Hex())
+	debt, err := cacheStore.HGet("user:debt", metric.UserAddress.Hex())
 	if err != nil {
 		return
 	}
@@ -37,9 +37,9 @@ func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, pri
 
 	healthFactor := domain.CalculateHealthFactor(getCollateralUSDAmount, debtBigInt)
 
-	cacheStore.Add("collateral:total_supply", usdAmountToChange)
-	cacheStore.Set("user:collateral_usd:"+metric.UserAddress.Hex(), getCollateralUSDAmount.String(), 0)
-	cacheStore.Set("user:health_factor:"+metric.UserAddress.Hex(), healthFactor.String(), 0)
+	cacheStore.HAdd("collateral", "total_supply", usdAmountToChange)
+	cacheStore.HSet("user:collateral_usd", metric.UserAddress.Hex(), getCollateralUSDAmount.String())
+	cacheStore.HSet("user:health_factor", metric.UserAddress.Hex(), healthFactor.String())
 }
 
 func getUSDAmountToChange(metric model.Metrics, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) (*big.Int, error) {

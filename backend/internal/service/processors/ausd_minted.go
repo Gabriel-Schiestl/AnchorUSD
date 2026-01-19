@@ -51,7 +51,6 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 }
 
 func decodeAUSDMintedEvent(log types.Log) *model.AUSDMintedEvent {
-	// AUSDMinted(address,uint256) - address e uint256 são indexed
 	if len(log.Topics) < 3 {
 		return nil
 	}

@@ -68,10 +68,10 @@ func setCoinMetric(cacheStore storage.ICacheStore, totalSupply **big.Int) {
 			minted.Sub(minted, burned)
 		}
 		(*totalSupply).Add(*totalSupply, minted)
-		cacheStore.Set("user:debt:"+user, minted.String(), 0)
+		cacheStore.HSet("user:debt", user, minted.String())
 	}
 
-	cacheStore.Set("coin:total_supply", (*totalSupply).String(), 0)
+	cacheStore.HSet("coin", "total_supply", (*totalSupply).String())
 }
 
 func setCollateralMetric(cacheStore storage.ICacheStore, ethPrice, btcPrice *big.Int, ethAddr, btcAddr string, totalCollateral *big.Int) {
@@ -101,7 +101,7 @@ func setCollateralMetric(cacheStore storage.ICacheStore, ethPrice, btcPrice *big
 
 			totalCollateral.Add(totalCollateral, collateralUsd)
 
-			debt, err := cacheStore.Get("user:debt:" + user)
+			debt, err := cacheStore.HGet("user:debt", user)
 			if err != nil {
 				continue
 			}
@@ -111,13 +111,13 @@ func setCollateralMetric(cacheStore storage.ICacheStore, ethPrice, btcPrice *big
 
 			healthFactor := domain.CalculateHealthFactor(collateralUsd, debtBigInt)
 
-			cacheStore.Set("user:health_factor:"+user, healthFactor.String(), 0)
+			cacheStore.HSet("user:health_factor", user, healthFactor.String())
 
-			cacheStore.Add("user:collateral_usd:"+user, collateralUsd)
+			cacheStore.HAdd("user:collateral_usd", user, collateralUsd)
 		}
 	}
 
-	cacheStore.Set("collateral:total_supply", totalCollateral.String(), 0)
+	cacheStore.HSet("collateral", "total_supply", totalCollateral.String())
 }
 
 func getCollateralUSD(collateralType string, deposited *big.Int, ethPrice, btcPrice *big.Int, ethAddr, btcAddr string) *big.Int {
