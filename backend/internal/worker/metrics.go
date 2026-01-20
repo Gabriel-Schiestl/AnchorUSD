@@ -21,17 +21,17 @@ func init() {
 }
 
 func RunMetricsWorker(cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) {
-	numLogWorkers := os.Getenv("NUM_LOG_WORKERS")
-	if numLogWorkers == "" {
-		numLogWorkers = "4"
+	numMetricsWorkers := os.Getenv("NUM_METRICS_WORKERS")
+	if numMetricsWorkers == "" {
+		numMetricsWorkers = "4"
 	}
 
-	intNumLogWorkers, err := strconv.Atoi(numLogWorkers)
+	intNumMetricsWorkers, err := strconv.Atoi(numMetricsWorkers)
 	if err != nil {
-		intNumLogWorkers = 4
+		intNumMetricsWorkers = 4
 	}
 
-	for i := 0; i < intNumLogWorkers; i++ {
+	for i := 0; i < intNumMetricsWorkers; i++ {
 		mp := &metricsProcessor{cacheStore: cacheStore}
 		go mp.process(cacheStore, priceFeed, priceStore)
 	}
