@@ -2,6 +2,7 @@ package processors
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
@@ -34,7 +35,7 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 		EventID:           eventModel.ID,
 		UserAddress:       event.From.Hex(),
 		CollateralAddress: event.TokenAddr.Hex(),
-		Amount:            event.Amount,
+		Amount:            model.NewBigInt(event.Amount),
 	}
 
 	err = storage.GetCollateralStore().CreateDeposit(context.Background(), deposit)
@@ -48,6 +49,7 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 		Asset:       model.CollateralAsset,
 		Operation:   model.Addition,
 		BlockNumber: eventModel.BlockNumber,
+		CollateralTokenAddress: event.TokenAddr,
 	}
 }
 
@@ -60,6 +62,6 @@ func decodeCollateralDepositedEvent(log types.Log) *model.CollateralDepositedEve
 	event.From = common.HexToAddress(log.Topics[1].Hex())
 	event.TokenAddr = common.HexToAddress(log.Topics[2].Hex())
 	event.Amount = new(big.Int).SetBytes(log.Topics[3].Bytes())
-
+	fmt.Println("Decoded CollateralDeposited event:", event.Amount, event.From.Hex(), event.TokenAddr.Hex())
 	return event
 }

@@ -33,7 +33,7 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 		ID:          uuid.New().String(),
 		EventID:     eventModel.ID,
 		UserAddress: event.From.Hex(),
-		Amount:      event.Amount,
+		Amount:      model.NewBigInt(event.Amount),
 	}
 
 	err = storage.GetCoinStore().CreateBurn(context.Background(), burn)

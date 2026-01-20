@@ -16,7 +16,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 	if event == nil {
 		return
 	}
-
+	
 	eventModel := &model.Events{
 		BlockNumber: log.BlockNumber,
 		TxHash:      log.TxHash.Hex(),
@@ -34,7 +34,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 		EventID:           eventModel.ID,
 		UserAddress:       event.From.Hex(),
 		CollateralAddress: event.TokenAddr.Hex(),
-		Amount:            event.Amount,
+		Amount:            model.NewBigInt(event.Amount),
 	}
 
 	err = storage.GetCollateralStore().CreateRedeem(context.Background(), collateral)

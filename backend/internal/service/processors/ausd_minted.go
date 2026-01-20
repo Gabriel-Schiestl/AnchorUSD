@@ -33,7 +33,7 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 		ID:          uuid.New().String(),
 		EventID:     eventModel.ID,
 		UserAddress: event.To.Hex(),
-		Amount:      event.Amount,
+		Amount:      model.NewBigInt(event.Amount),
 	}
 
 	err = storage.GetCoinStore().CreateMint(context.Background(), mint)

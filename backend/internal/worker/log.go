@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/big"
 	"os"
@@ -81,6 +82,7 @@ func processLogs(logsChan <-chan types.Log, sub ethereum.Subscription, eventStor
 }
 
 func decodeLog(vLog types.Log, eventStore EventStore) {
+	fmt.Println("Processing log in block:", vLog.BlockNumber, " with index:", vLog.Index)
 	if event, _ := eventStore.FindOneInBlock(context.Background(), vLog.Index, vLog.BlockNumber); event != nil {
 		return
 	}
@@ -95,8 +97,6 @@ func decodeLog(vLog types.Log, eventStore EventStore) {
 
 func checkProcessorExists(eventName string, vLog types.Log) {
 	if processor, exists := Processors[eventName]; exists {
-		go processor(eventName, vLog, metricsChan)
+		processor(eventName, vLog, metricsChan)
 	}
-
-	log.Printf("No processor found for event: %s", eventName)
 }

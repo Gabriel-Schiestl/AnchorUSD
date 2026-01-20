@@ -15,9 +15,8 @@ type collateralStore struct {
 }
 
 func NewCollateralStore(db *gorm.DB) *collateralStore {
-	return &collateralStore{
-		DB: db,
-	}
+	collatStore = collateralStore{DB: db}
+	return &collatStore
 }
 
 func GetCollateralStore() *collateralStore {
@@ -37,14 +36,14 @@ func (s *collateralStore) CreateDeposit(ctx context.Context, deposit *model.Depo
 func (s *collateralStore) GetTotalCollateralDepositedGroupingByUser(ctx context.Context) (map[string]map[string]*big.Int, error) {
 	var results []struct {
 		UserAddress    string
-		CollateralType string
-		TotalDeposited *big.Int
+		CollateralAddress string
+		TotalDeposited model.BigInt
 	}
 
 	err := s.DB.WithContext(ctx).
 		Model(&model.Deposit{}).
-		Select("user_address, collateral_type, SUM(amount) as total_deposited").
-		Group("user_address, collateral_type").
+		Select("user_address, collateral_address, SUM(amount) as total_deposited").
+		Group("user_address, collateral_address").
 		Scan(&results).Error
 	if err != nil {
 		return nil, err
@@ -55,7 +54,7 @@ func (s *collateralStore) GetTotalCollateralDepositedGroupingByUser(ctx context.
 		if _, exists := totalCollateralByUser[result.UserAddress]; !exists {
 			totalCollateralByUser[result.UserAddress] = make(map[string]*big.Int)
 		}
-		totalCollateralByUser[result.UserAddress][result.CollateralType] = result.TotalDeposited
+		totalCollateralByUser[result.UserAddress][result.CollateralAddress] = result.TotalDeposited.Int
 	}
 
 	return totalCollateralByUser, nil
@@ -63,15 +62,15 @@ func (s *collateralStore) GetTotalCollateralDepositedGroupingByUser(ctx context.
 
 func (s *collateralStore) GetTotalCollateralRedeemedGroupingByUser(ctx context.Context) (map[string]map[string]*big.Int, error) {
 	var results []struct {
-		UserAddress    string
-		CollateralType string
-		TotalRedeemed  *big.Int
+		UserAddress      string
+		CollateralAddress string
+		TotalRedeemed    model.BigInt
 	}
 
 	err := s.DB.WithContext(ctx).
 		Model(&model.Redeem{}).
-		Select("user_address, collateral_type, SUM(amount) as total_redeemed").
-		Group("user_address, collateral_type").
+		Select("user_address, collateral_address, SUM(amount) as total_redeemed").
+		Group("user_address, collateral_address").
 		Scan(&results).Error
 	if err != nil {
 		return nil, err
@@ -82,7 +81,7 @@ func (s *collateralStore) GetTotalCollateralRedeemedGroupingByUser(ctx context.C
 		if _, exists := totalRedeemedByUser[result.UserAddress]; !exists {
 			totalRedeemedByUser[result.UserAddress] = make(map[string]*big.Int)
 		}
-		totalRedeemedByUser[result.UserAddress][result.CollateralType] = result.TotalRedeemed
+		totalRedeemedByUser[result.UserAddress][result.CollateralAddress] = result.TotalRedeemed.Int
 	}
 
 	return totalRedeemedByUser, nil

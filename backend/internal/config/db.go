@@ -11,7 +11,7 @@ import (
 
 func GetDBInstance() *gorm.DB {
 	port := os.Getenv("DB_PORT")
-	hostname := os.Getenv("DB_HOSTNAME")
+	hostname := os.Getenv("DB_HOST")
 	username := os.Getenv("DB_USERNAME")
 	password := os.Getenv("DB_PASSWORD")
 	dbname := os.Getenv("DB_NAME")

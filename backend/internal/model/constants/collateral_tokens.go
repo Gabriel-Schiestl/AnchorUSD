@@ -7,7 +7,7 @@ import (
 
 var CollateralTokens = map[string]string{}
 
-func init() {
+func LoadCollateralTokens() {
 	collaterals := os.Getenv("COLLATERAL_TOKEN_ADDRESSES")
 	collateralsNames := os.Getenv("COLLATERAL_TOKEN_NAMES")
 

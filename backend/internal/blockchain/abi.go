@@ -9,7 +9,7 @@ import (
 var contractABI *abi.ABI
 
 func loadABI() (*abi.ABI, error) {
-	f, err := os.Open("../../AUSDEngine.abi.json")
+	f, err := os.Open("./AUSDEngine.abi.json")
 	if err != nil {
 		return nil, err
 	}

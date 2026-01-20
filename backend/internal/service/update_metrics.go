@@ -2,29 +2,30 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"math/big"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/domain"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/http/external"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model/constants"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 func UpdateMetrics(cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI) {
-	var totalCollateral *big.Int
-	var totalSupply *big.Int
-	var ethPrice *big.Int
-	var btcPrice *big.Int
+	totalSupply := big.NewInt(0)
+	var ethPrice string
+	var btcPrice string
 	var ethAddr, btcAddr string
 
 	getUsdPriceAndAddress(priceFeed, &ethPrice, &btcPrice, &ethAddr, &btcAddr)
 
 	setCoinMetric(cacheStore, &totalSupply)
 
-	setCollateralMetric(cacheStore, ethPrice, btcPrice, ethAddr, btcAddr, totalCollateral)
+	setCollateralMetric(cacheStore, ethPrice, btcPrice, ethAddr, btcAddr)
 }
 
-func getUsdPriceAndAddress(priceFeed external.IPriceFeedAPI, ethPrice **big.Int, btcPrice **big.Int, ethAddr *string, btcAddr *string) {
+func getUsdPriceAndAddress(priceFeed external.IPriceFeedAPI, ethPrice *string, btcPrice *string, ethAddr *string, btcAddr *string) {
 	for name, address := range constants.CollateralTokens {
 		switch name {
 		case "ETH":
@@ -32,20 +33,14 @@ func getUsdPriceAndAddress(priceFeed external.IPriceFeedAPI, ethPrice **big.Int,
 			if err != nil {
 				continue
 			}
-			priceBigInt := big.NewInt(0)
-			priceBigInt.SetString(priceStr, 10)
-
-			*ethPrice = new(big.Int).Mul(priceBigInt, constants.PRICE_PRECISION)
+			*ethPrice = priceStr
 			*ethAddr = address
 		case "BTC":
 			priceStr, err := priceFeed.GetBtcUsdPrice()
 			if err != nil {
 				continue
 			}
-			priceBigInt := big.NewInt(0)
-			priceBigInt.SetString(priceStr, 10)
-
-			*btcPrice = new(big.Int).Mul(priceBigInt, constants.PRICE_PRECISION)
+			*btcPrice = priceStr
 			*btcAddr = address
 		}
 	}
@@ -68,13 +63,18 @@ func setCoinMetric(cacheStore storage.ICacheStore, totalSupply **big.Int) {
 			minted.Sub(minted, burned)
 		}
 		(*totalSupply).Add(*totalSupply, minted)
+		if minted.Cmp(big.NewInt(0)) < 0 {
+			minted = big.NewInt(0)
+		}
 		cacheStore.HSet("user:debt", user, minted.String())
 	}
 
 	cacheStore.HSet("coin", "total_supply", (*totalSupply).String())
 }
 
-func setCollateralMetric(cacheStore storage.ICacheStore, ethPrice, btcPrice *big.Int, ethAddr, btcAddr string, totalCollateral *big.Int) {
+func setCollateralMetric(cacheStore storage.ICacheStore, ethPrice, btcPrice string, ethAddr, btcAddr string) {
+	totalCollateral := big.NewInt(0)
+	
 	totalDepositedByUser, err := storage.GetCollateralStore().GetTotalCollateralDepositedGroupingByUser(context.Background())
 	if err != nil {
 		return
@@ -120,15 +120,31 @@ func setCollateralMetric(cacheStore storage.ICacheStore, ethPrice, btcPrice *big
 	cacheStore.HSet("collateral", "total_supply", totalCollateral.String())
 }
 
-func getCollateralUSD(collateralType string, deposited *big.Int, ethPrice, btcPrice *big.Int, ethAddr, btcAddr string) *big.Int {
-	var collateralUsd *big.Int
-	switch collateralType {
-	case ethAddr:
-		collateralUsd = big.NewInt(0).Mul(deposited, ethPrice)
-		collateralUsd = collateralUsd.Div(collateralUsd, big.NewInt(1e18))
-	case btcAddr:
-		collateralUsd = big.NewInt(0).Mul(deposited, btcPrice)
-		collateralUsd = collateralUsd.Div(collateralUsd, big.NewInt(1e8))
-	}
-	return collateralUsd
+func getCollateralUSD(collateralType string, deposited *big.Int, ethPrice, btcPrice string, ethAddr, btcAddr string) *big.Int {
+	if deposited == nil || deposited.Sign() == 0 {
+        return big.NewInt(0)
+    }
+	fmt.Println("Calculating USD value for collateral type:", collateralType, " with deposited amount:", deposited.String())
+    cAddr := common.HexToAddress(collateralType)
+    ethA := common.HexToAddress(ethAddr)
+    btcA := common.HexToAddress(btcAddr)
+	
+	res := big.NewInt(0)
+	var err error
+
+    if ethA != (common.Address{}) && cAddr == ethA {
+		res, err = domain.GetTokenAmountInUSD(deposited, ethPrice)
+		if err != nil {
+			return big.NewInt(0)
+		}
+    }
+
+    if btcA != (common.Address{}) && cAddr == btcA {
+		res, err = domain.GetTokenAmountInUSD(deposited, btcPrice)
+		if err != nil {
+			return big.NewInt(0)
+		}
+    }
+
+    return res
 }

@@ -15,9 +15,8 @@ type coinStore struct {
 }
 
 func NewCoinStore(db *gorm.DB) *coinStore {
-	return &coinStore{
-		DB: db,
-	}
+	coinStr = coinStore{DB: db}
+	return &coinStr
 }
 
 func GetCoinStore() *coinStore {
@@ -32,7 +31,7 @@ func (cs *coinStore) CreateBurn(ctx context.Context, burn *model.Burns) error {
 func (cs *coinStore) GetTotalBurnedGroupingByUser(ctx context.Context) (map[string]*big.Int, error) {
 	var results []struct {
 		UserAddress string
-		TotalBurned *big.Int
+		TotalBurned model.BigInt
 	}
 
 	err := cs.DB.WithContext(ctx).
@@ -46,7 +45,7 @@ func (cs *coinStore) GetTotalBurnedGroupingByUser(ctx context.Context) (map[stri
 
 	totalBurnedByUser := make(map[string]*big.Int)
 	for _, result := range results {
-		totalBurnedByUser[result.UserAddress] = result.TotalBurned
+		totalBurnedByUser[result.UserAddress] = result.TotalBurned.Int
 	}
 
 	return totalBurnedByUser, nil
@@ -60,7 +59,7 @@ func (cs *coinStore) CreateMint(ctx context.Context, mint *model.Mints) error {
 func (cs *coinStore) GetTotalMintedGroupingByUser(ctx context.Context) (map[string]*big.Int, error) {
 	var results []struct {
 		UserAddress string
-		TotalMinted *big.Int
+		TotalMinted model.BigInt
 	}
 
 	err := cs.DB.WithContext(ctx).
@@ -74,7 +73,7 @@ func (cs *coinStore) GetTotalMintedGroupingByUser(ctx context.Context) (map[stri
 
 	totalMintedByUser := make(map[string]*big.Int)
 	for _, result := range results {
-		totalMintedByUser[result.UserAddress] = result.TotalMinted
+		totalMintedByUser[result.UserAddress] = result.TotalMinted.Int
 	}
 
 	return totalMintedByUser, nil
