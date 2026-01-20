@@ -23,7 +23,7 @@ type CollateralDepositedEvent struct {
 type CollateralRedeemedEvent struct {
 	From      common.Address
 	To        common.Address
-	TokenAddr common.Address
+	Token common.Address
 	Amount    *big.Int
 }
 

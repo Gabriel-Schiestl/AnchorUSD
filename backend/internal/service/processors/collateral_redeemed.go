@@ -33,7 +33,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 		ID:                uuid.New().String(),
 		EventID:           eventModel.ID,
 		UserAddress:       event.From.Hex(),
-		CollateralAddress: event.TokenAddr.Hex(),
+		CollateralAddress: event.Token.Hex(),
 		Amount:            model.NewBigInt(event.Amount),
 	}
 
