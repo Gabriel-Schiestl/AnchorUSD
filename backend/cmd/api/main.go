@@ -36,6 +36,11 @@ func main() {
 	metricsStore := storage.NewMetricsStore(db)
 	metricsService := service.NewMetricsService(metricsStore)
 
+	userDataService := service.NewUserDataService(cacheStore)
+
+	priceFeed := external.NewPriceFeedAPI()
+	healthFactorCalcService := service.NewHealthFactorCalculationService(cacheStore, priceFeed)
+
 	eventStore := storage.NewEventsStore(db)
 	storage.NewCoinStore(db)
 	storage.NewCollateralStore(db)
@@ -43,14 +48,12 @@ func main() {
 
 	priceStore := storage.NewPriceStore(db)
 
-	priceFeed := external.NewPriceFeedAPI()
-
 	worker.RunLogWorker(bChainClient, bChainConfig, eventStore)
 	worker.RunMetricsWorker(cacheStore, priceFeed, priceStore)
 	worker.RunLiquidationsWorker(cacheStore, priceFeed)
 
 	service.UpdateMetrics(cacheStore, priceFeed)
 
-	http.RegisterRoutes(metricsService)
+	http.RegisterRoutes(metricsService, userDataService, healthFactorCalcService)
 	http.Run(":8080")
 }

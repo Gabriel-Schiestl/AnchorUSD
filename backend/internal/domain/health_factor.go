@@ -18,3 +18,21 @@ func CalculateHealthFactor(collateralValueUSD, debtValueUSD *big.Int) *big.Int {
 
 	return healthFactor
 }
+
+func CalculateHealthFactorAfterMint(currentCollateralUSD, currentDebt, mintAmount *big.Int) *big.Int {
+	newDebt := new(big.Int).Add(currentDebt, mintAmount)
+	return CalculateHealthFactor(currentCollateralUSD, newDebt)
+}
+
+func CalculateHealthFactorAfterBurn(currentCollateralUSD, currentDebt, burnAmount *big.Int) *big.Int {
+	newDebt := new(big.Int).Sub(currentDebt, burnAmount)
+	if newDebt.Sign() < 0 {
+		newDebt = big.NewInt(0)
+	}
+	return CalculateHealthFactor(currentCollateralUSD, newDebt)
+}
+
+func CalculateHealthFactorAfterDeposit(currentCollateralUSD, currentDebt, depositAmountUSD *big.Int) *big.Int {
+	newCollateralUSD := new(big.Int).Add(currentCollateralUSD, depositAmountUSD)
+	return CalculateHealthFactor(newCollateralUSD, currentDebt)
+}
