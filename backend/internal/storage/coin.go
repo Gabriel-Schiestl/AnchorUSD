@@ -27,6 +27,16 @@ func (cs *coinStore) CreateBurn(ctx context.Context, burn *model.Burns) error {
 	return cs.DB.WithContext(ctx).Create(burn).Error
 }
 
+func (cs *coinStore) GetLatestBurns(ctx context.Context, userAddress string, limit int) ([]model.Burns, error) {
+	var burns []model.Burns
+	err := cs.DB.WithContext(ctx).
+		Where("user_address = ?", userAddress).
+		Order("event_id DESC").
+		Limit(limit).
+		Find(&burns).Error
+	return burns, err
+}
+
 // TODO: implement pagination for large datasets
 func (cs *coinStore) GetTotalBurnedGroupingByUser(ctx context.Context) (map[string]*big.Int, error) {
 	var results []struct {
@@ -53,6 +63,16 @@ func (cs *coinStore) GetTotalBurnedGroupingByUser(ctx context.Context) (map[stri
 
 func (cs *coinStore) CreateMint(ctx context.Context, mint *model.Mints) error {
 	return cs.DB.WithContext(ctx).Create(mint).Error
+}
+
+func (cs *coinStore) GetLatestMints(ctx context.Context, userAddress string, limit int) ([]model.Mints, error) {
+	var mints []model.Mints
+	err := cs.DB.WithContext(ctx).
+		Where("user_address = ?", userAddress).
+		Order("event_id DESC").
+		Limit(limit).
+		Find(&mints).Error
+	return mints, err
 }
 
 // TODO: implement pagination for large datasets

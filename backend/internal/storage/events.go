@@ -71,3 +71,22 @@ func (s *eventsStore) GetLastProcessedBlock() (int64, error) {
 	logger.Info().Int64("last_block", int64(event.BlockNumber)).Msg("Last processed block retrieved")
 	return int64(event.BlockNumber), nil
 }
+
+func (s *eventsStore) GetEventByID(ctx context.Context, eventID uint) (*model.Events, error) {
+	logger := utils.GetLogger()
+	logger.Debug().Uint("event_id", eventID).Msg("Fetching event by ID")
+
+	var event model.Events
+	result := s.DB.WithContext(ctx).Where("id = ?", eventID).First(&event)
+	if result.Error != nil {
+		if result.Error == gorm.ErrRecordNotFound {
+			logger.Debug().Uint("event_id", eventID).Msg("Event not found")
+			return nil, nil
+		}
+		logger.Error().Err(result.Error).Uint("event_id", eventID).Msg("Error finding event")
+		return nil, result.Error
+	}
+
+	logger.Debug().Uint("event_id", event.ID).Msg("Event found")
+	return &event, nil
+}

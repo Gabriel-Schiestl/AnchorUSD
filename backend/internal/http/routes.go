@@ -11,6 +11,7 @@ func RegisterRoutes(
 	userDataSvc handlers.UserReader,
 	hfCalcSvc handlers.HealthFactorCalculator,
 	dashboardMetricsSvc handlers.DashboardMetricsReader,
+	historySvc handlers.HistoryReader,
 ) {
 	logger := utils.GetLogger()
 	logger.Info().Msg("Registering HTTP routes")
@@ -32,6 +33,9 @@ func RegisterRoutes(
 
 	api.GET("/user/:user", handlers.GetUserDataHandler(userDataSvc))
 	logger.Debug().Msg("Registered /api/user/:user route")
+
+	api.GET("/history/:user", handlers.GetHistoryHandler(historySvc))
+	logger.Debug().Msg("Registered /api/history/:user route")
 
 	ausdEngine := api.Group("/ausd-engine")
 	{

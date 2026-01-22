@@ -33,6 +33,26 @@ func (s *collateralStore) CreateDeposit(ctx context.Context, deposit *model.Depo
 	return result.Error
 }
 
+func (s *collateralStore) GetLatestDeposits(ctx context.Context, userAddress string, limit int) ([]model.Deposit, error) {
+	var deposits []model.Deposit
+	err := s.DB.WithContext(ctx).
+		Where("user_address = ?", userAddress).
+		Order("event_id DESC").
+		Limit(limit).
+		Find(&deposits).Error
+	return deposits, err
+}
+
+func (s *collateralStore) GetLatestRedeems(ctx context.Context, userAddress string, limit int) ([]model.Redeem, error) {
+	var redeems []model.Redeem
+	err := s.DB.WithContext(ctx).
+		Where("user_address = ?", userAddress).
+		Order("event_id DESC").
+		Limit(limit).
+		Find(&redeems).Error
+	return redeems, err
+}
+
 func (s *collateralStore) GetTotalCollateralDepositedGroupingByUser(ctx context.Context) (map[string]map[string]*big.Int, error) {
 	var results []struct {
 		UserAddress    string

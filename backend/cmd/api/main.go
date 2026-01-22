@@ -77,11 +77,15 @@ func main() {
 
 	logger.Info().Msg("Initializing storage layers")
 	eventStore := storage.NewEventsStore(db)
-	storage.NewCoinStore(db)
-	storage.NewCollateralStore(db)
-	storage.NewLiquidationStore(db)
+	coinStore := storage.NewCoinStore(db)
+	collateralStore := storage.NewCollateralStore(db)
+	liquidationStore := storage.NewLiquidationStore(db)
 	priceStore := storage.NewPriceStore(db)
 	logger.Info().Msg("All storage layers initialized")
+
+	logger.Info().Msg("Initializing history service")
+	historyService := service.NewHistoryService(collateralStore, coinStore, liquidationStore, eventStore)
+	logger.Info().Msg("History service ready")
 
 	logger.Info().Msg("Starting log worker for blockchain events")
 	worker.RunLogWorker(bChainClient, bChainConfig, eventStore)
@@ -100,7 +104,7 @@ func main() {
 	logger.Info().Msg("Initial metrics updated")
 
 	logger.Info().Msg("Registering HTTP routes")
-	http.RegisterRoutes(metricsService, userDataService, healthFactorCalcService, dashboardMetricsService)
+	http.RegisterRoutes(metricsService, userDataService, healthFactorCalcService, dashboardMetricsService, historyService)
 	logger.Info().Msg("HTTP routes registered")
 
 	logger.Info().Str("address", ":8080").Msg("Starting HTTP server")
