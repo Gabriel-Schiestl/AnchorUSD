@@ -37,13 +37,19 @@ contract BaseEngineTest is Test {
         uint256 indexed amount
     );
     event CollateralRedeemed(
-        address indexed redeemedFrom,
-        address indexed redeemedTo,
-        address token,
-        uint256 amount
+        address indexed user,
+        address indexed token,
+        uint256 indexed amount
     );
     event AUSDMinted(address indexed user, uint256 indexed amount);
-    event AUSDBurned(address indexed from, uint256 indexed amount);
+    event AUSDBurned(address indexed user, uint256 indexed amount);
+    event Liquidation(
+        address indexed liquidatedUser,
+        address indexed liquidator,
+        address indexed tokenCollateral,
+        uint256 collateralAmount,
+        uint256 debtCovered
+    );
 
     function setUp() external {
         deployer = new DeployAUSD();

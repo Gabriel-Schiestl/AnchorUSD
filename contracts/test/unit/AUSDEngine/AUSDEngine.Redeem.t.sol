@@ -23,13 +23,8 @@ contract AUSDEngineRedeemTest is BaseEngineTest {
         vm.startPrank(USER);
         engine.depositCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
 
-        vm.expectEmit(true, true, false, true, address(engine));
-        emit CollateralRedeemed(
-            USER,
-            USER,
-            wethAddr,
-            COLLATERAL_DEPOSIT_AMOUNT
-        );
+        vm.expectEmit(true, true, true, false, address(engine));
+        emit CollateralRedeemed(USER, wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
 
         engine.redeemCollateral(wethAddr, COLLATERAL_DEPOSIT_AMOUNT);
         vm.stopPrank();

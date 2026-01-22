@@ -22,7 +22,7 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 		return
 	}
 
-	logger.Debug().Str("user", event.From.Hex()).Str("amount", event.Amount.String()).Msg("AUSD burned event decoded successfully")
+	logger.Debug().Str("user", event.User.Hex()).Str("amount", event.Amount.String()).Msg("AUSD burned event decoded successfully")
 
 	eventModel := &model.Events{
 		BlockNumber: log.BlockNumber,
@@ -41,19 +41,19 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 	burn := &model.Burns{
 		ID:          uuid.New().String(),
 		EventID:     eventModel.ID,
-		UserAddress: event.From.Hex(),
+		UserAddress: event.User.Hex(),
 		Amount:      model.NewBigInt(event.Amount),
 	}
 
 	err = storage.GetCoinStore().CreateBurn(context.Background(), burn)
 	if err != nil {
-		logger.Error().Err(err).Str("user", event.From.Hex()).Msg("Failed to create burn record")
+		logger.Error().Err(err).Str("user", event.User.Hex()).Msg("Failed to create burn record")
 		return
 	}
 	logger.Debug().Str("burn_id", burn.ID).Msg("Burn record created")
 
 	metric := model.Metrics{
-		UserAddress: event.From,
+		UserAddress: event.User,
 		Amount:      event.Amount,
 		Asset:       model.StablecoinAsset,
 		Operation:   model.Subtraction,
@@ -61,7 +61,7 @@ func ProcessAUSDBurned(eventName string, log types.Log, metricsChan chan<- model
 	}
 
 	metricsChan <- metric
-	logger.Info().Str("user", event.From.Hex()).Str("amount", event.Amount.String()).Msg("AUSD burned event processed and metric sent to channel")
+	logger.Info().Str("user", event.User.Hex()).Str("amount", event.Amount.String()).Msg("AUSD burned event processed and metric sent to channel")
 }
 
 func decodeAUSDBurnedEvent(log types.Log) *model.AUSDBurnedEvent {
@@ -70,7 +70,7 @@ func decodeAUSDBurnedEvent(log types.Log) *model.AUSDBurnedEvent {
 	}
 
 	event := &model.AUSDBurnedEvent{}
-	event.From = common.HexToAddress(log.Topics[1].Hex())
+	event.User = common.HexToAddress(log.Topics[1].Hex())
 	event.Amount = new(big.Int).SetBytes(log.Topics[2].Bytes())
 
 	return event

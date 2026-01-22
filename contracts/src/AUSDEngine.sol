@@ -141,17 +141,14 @@ contract AUSDEngine is ReentrancyGuard {
 
     /**
      * @notice Emitted when collateral is redeemed
-     * @param redeemedFrom Address from whom the collateral was withdrawn
-     * @param redeemedTo Address to whom the collateral was sent
+     * @param user Address of the user who redeemed the collateral
      * @param token Address of the redeemed token
      * @param amount Amount redeemed
-     * @dev If redeemedFrom != redeemedTo, indicates a liquidation
      */
     event CollateralRedeemed(
-        address indexed redeemedFrom,
-        address indexed redeemedTo,
-        address token,
-        uint256 amount
+        address indexed user,
+        address indexed token,
+        uint256 indexed amount
     );
 
     /**
@@ -163,10 +160,26 @@ contract AUSDEngine is ReentrancyGuard {
 
     /**
      * @notice Emitted when AUSD is burned
-     * @param from Address from whom the AUSD was burned
+     * @param user Address of the user whose debt was reduced
      * @param amount Amount of AUSD burned
      */
-    event AUSDBurned(address indexed from, uint256 indexed amount);
+    event AUSDBurned(address indexed user, uint256 indexed amount);
+
+    /**
+     * @notice Emitted when a liquidation occurs
+     * @param liquidatedUser Address of the user being liquidated
+     * @param liquidator Address of the liquidator
+     * @param tokenCollateral Address of the collateral token transferred
+     * @param collateralAmount Amount of collateral transferred (including bonus)
+     * @param debtCovered Amount of debt covered in AUSD
+     */
+    event Liquidation(
+        address indexed liquidatedUser,
+        address indexed liquidator,
+        address indexed tokenCollateral,
+        uint256 collateralAmount,
+        uint256 debtCovered
+    );
 
     //////// Modifiers ////////
 
@@ -326,7 +339,7 @@ contract AUSDEngine is ReentrancyGuard {
         address token,
         uint256 _amount
     ) public onlyAllowedTokens(token) moreThanZero(_amount) nonReentrant {
-        _redeemCollateral(msg.sender, msg.sender, token, _amount);
+        _redeemCollateral(msg.sender, token, _amount);
         _revertIfHealthFactorBroken(msg.sender);
     }
 
@@ -358,8 +371,8 @@ contract AUSDEngine is ReentrancyGuard {
         moreThanZero(aUSDToBurn)
         nonReentrant
     {
-        _burnAUSD(msg.sender, msg.sender, aUSDToBurn);
-        _redeemCollateral(msg.sender, msg.sender, token, _collateralAmount);
+        _burnAUSD(msg.sender, aUSDToBurn);
+        _redeemCollateral(msg.sender, token, _collateralAmount);
         _revertIfHealthFactorBroken(msg.sender);
     }
 
@@ -406,7 +419,7 @@ contract AUSDEngine is ReentrancyGuard {
      * - Burns AUSD tokens
      */
     function burnAUSD(uint256 _amount) public moreThanZero(_amount) {
-        _burnAUSD(msg.sender, msg.sender, _amount);
+        _burnAUSD(msg.sender, _amount);
     }
 
     /**
@@ -462,13 +475,27 @@ contract AUSDEngine is ReentrancyGuard {
         uint256 bonusCollateral = ((tokenAmount * LIQUIDATION_BONUS) /
             LIQUIDATION_PRECISION);
 
-        _redeemCollateral(
+        uint256 totalCollateralToRedeem = tokenAmount + bonusCollateral;
+
+        if (s_collateralDeposited[user][token] < totalCollateralToRedeem) {
+            revert AUSDEngine__InsufficientCollateral();
+        }
+        s_collateralDeposited[user][token] -= totalCollateralToRedeem;
+
+        if (s_totalDebt[user] < debtToCover)
+            revert AUSDEngine__BurnAmountExceedsDebt();
+        s_totalDebt[user] -= debtToCover;
+
+        emit Liquidation(
             user,
             msg.sender,
             token,
-            tokenAmount + bonusCollateral
+            totalCollateralToRedeem,
+            debtToCover
         );
-        _burnAUSD(user, msg.sender, debtToCover);
+
+        IERC20(token).safeTransfer(msg.sender, totalCollateralToRedeem);
+        s_ausd.burn(msg.sender, debtToCover);
 
         uint256 endingHealthFactor = _getHealthFactor(user);
         if (endingHealthFactor <= startingHealthFactor)
@@ -501,71 +528,62 @@ contract AUSDEngine is ReentrancyGuard {
 
     /**
      * @notice Internal function to redeem collateral
-     * @param from Address from whom the collateral will be withdrawn
-     * @param to Address that will receive the collateral
+     * @param user Address of the user redeeming collateral
      * @param token Address of the collateral token
      * @param _amount Amount to redeem
      *
-     * @dev Allows transfer between different addresses (used in liquidations)
      * @dev Emits CollateralRedeemed event
      * @dev Uses SafeERC20 for secure transfer
      *
      * Requirements:
-     * - from must have sufficient collateral
+     * - user must have sufficient collateral
      *
      * Effects:
-     * - Decreases s_collateralDeposited[from][token]
-     * - Transfers tokens to 'to'
+     * - Decreases s_collateralDeposited[user][token]
+     * - Transfers tokens to user
      *
      * @custom:security Critical: does not check health factor - caller function's responsibility
      */
     function _redeemCollateral(
-        address from,
-        address to,
+        address user,
         address token,
         uint256 _amount
     ) private {
-        uint256 collateralDeposited = s_collateralDeposited[from][token];
+        uint256 collateralDeposited = s_collateralDeposited[user][token];
         if (_amount > collateralDeposited) {
             revert AUSDEngine__InsufficientCollateral();
         }
 
-        s_collateralDeposited[from][token] -= _amount;
-        emit CollateralRedeemed(from, to, token, _amount);
+        s_collateralDeposited[user][token] -= _amount;
+        emit CollateralRedeemed(user, token, _amount);
 
-        IERC20(token).safeTransfer(to, _amount);
+        IERC20(token).safeTransfer(user, _amount);
     }
 
     /**
      * @notice Internal function to burn AUSD
-     * @param onBehalfOf Address whose debt will be reduced
-     * @param aUSDFrom Address from where AUSD will be burned
+     * @param user Address whose debt will be reduced and AUSD burned from
      * @param _amount Amount of AUSD to burn
      *
-     * @dev Allows burning AUSD from one user on behalf of another (used in liquidations)
      * @dev Emits AUSDBurned event
      *
      * Requirements:
-     * - onBehalfOf must have debt >= _amount
-     * - aUSDFrom must have AUSD >= _amount
+     * - user must have debt >= _amount
+     * - user must have AUSD >= _amount
      *
      * Effects:
-     * - Decreases s_totalDebt[onBehalfOf]
-     * - Burns AUSD tokens from aUSDFrom
+     * - Decreases s_totalDebt[user]
+     * - Burns AUSD tokens from user
      */
-    function _burnAUSD(
-        address onBehalfOf,
-        address aUSDFrom,
-        uint256 _amount
-    ) private {
-        if (s_totalDebt[onBehalfOf] < _amount)
+    function _burnAUSD(address user, uint256 _amount) private {
+        if (s_totalDebt[user] < _amount)
             revert AUSDEngine__BurnAmountExceedsDebt();
 
-        s_totalDebt[onBehalfOf] -= _amount;
+        s_totalDebt[user] -= _amount;
 
-        emit AUSDBurned(aUSDFrom, _amount);
+        emit AUSDBurned(user, _amount);
 
-        s_ausd.burn(aUSDFrom, _amount);
+        s_ausd.burn(user, _amount);
     }
 
     //////// Private & Internal View & Pure Functions ////////

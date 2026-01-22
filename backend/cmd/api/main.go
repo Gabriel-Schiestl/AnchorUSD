@@ -43,7 +43,7 @@ func main() {
 	logger.Info().Msg("Cache configuration loaded")
 
 	logger.Info().Msg("Running database migrations")
-	db.AutoMigrate(model.Events{}, model.Burns{}, model.Deposit{}, model.Events{}, model.Mints{}, model.Prices{}, model.Redeem{})
+	db.AutoMigrate(model.Events{}, model.Burns{}, model.Deposit{}, model.Events{}, model.Mints{}, model.Prices{}, model.Redeem{}, model.Liquidations{})
 	logger.Info().Msg("Database migrations completed successfully")
 
 	logger.Info().Msg("Initializing blockchain client")
@@ -79,6 +79,7 @@ func main() {
 	eventStore := storage.NewEventsStore(db)
 	storage.NewCoinStore(db)
 	storage.NewCollateralStore(db)
+	storage.NewLiquidationStore(db)
 	priceStore := storage.NewPriceStore(db)
 	logger.Info().Msg("All storage layers initialized")
 

@@ -32,6 +32,7 @@ var Processors = map[string]Processor{
 	"AUSDMinted":          processors.ProcessAUSDMinted,
 	"AUSDBurned":          processors.ProcessAUSDBurned,
 	"CollateralRedeemed":  processors.ProcessCollateralRedeemed,
+	"Liquidation":         processors.ProcessLiquidation,
 }
 
 func RunLogWorker(bchainClient *ethclient.Client, bchainConfig BlockchainConfig, eventStore EventStore) {

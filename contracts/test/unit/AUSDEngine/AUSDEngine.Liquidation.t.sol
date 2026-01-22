@@ -165,13 +165,13 @@ contract AUSDEngineLiquidationTest is BaseEngineTest {
         uint256 bonusCollateral = ((tokenAmount *
             engine.getLiquidationBonus()) / engine.getLiquidationPrecision());
 
-        // Expect CollateralRedeemed event
-        vm.expectEmit(true, true, false, true, address(engine));
-        emit CollateralRedeemed(
+        vm.expectEmit(true, true, true, true, address(engine));
+        emit Liquidation(
             USER,
             LIQUIDATOR,
             wethAddr,
-            tokenAmount + bonusCollateral
+            tokenAmount + bonusCollateral,
+            MINT_AMOUNT
         );
 
         engine.liquidate(USER, wethAddr, MINT_AMOUNT);

@@ -9,9 +9,10 @@ import (
 
 var EventsSignatures = []*EventSignature{
 	{Name: "CollateralDeposited", Signature: "CollateralDeposited(address,address,uint256)"},
-	{Name: "CollateralRedeemed", Signature: "CollateralRedeemed(address,address,address,uint256)"},
+	{Name: "CollateralRedeemed", Signature: "CollateralRedeemed(address,address,uint256)"},
 	{Name: "AUSDMinted", Signature: "AUSDMinted(address,uint256)"},
 	{Name: "AUSDBurned", Signature: "AUSDBurned(address,uint256)"},
+	{Name: "Liquidation", Signature: "Liquidation(address,address,address,uint256,uint256)"},
 }
 
 type CollateralDepositedEvent struct {
@@ -21,10 +22,9 @@ type CollateralDepositedEvent struct {
 }
 
 type CollateralRedeemedEvent struct {
-	From      common.Address
-	To        common.Address
-	Token common.Address
-	Amount    *big.Int
+	User   common.Address
+	Token  common.Address
+	Amount *big.Int
 }
 
 type AUSDMintedEvent struct {
@@ -33,8 +33,16 @@ type AUSDMintedEvent struct {
 }
 
 type AUSDBurnedEvent struct {
-	From   common.Address
+	User   common.Address
 	Amount *big.Int
+}
+
+type LiquidationEvent struct {
+	LiquidatedUser  common.Address
+	Liquidator      common.Address
+	TokenCollateral common.Address
+	CollateralAmount *big.Int
+	DebtCovered     *big.Int
 }
 
 type EventSignature struct {

@@ -2,8 +2,8 @@ package processors
 
 import (
 	"context"
+	"math/big"
 
-	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/blockchain"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
@@ -22,7 +22,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 		return
 	}
 
-	logger.Debug().Str("user", event.From.Hex()).Str("token", event.Token.Hex()).Str("amount", event.Amount.String()).Msg("Event decoded successfully")
+	logger.Debug().Str("user", event.User.Hex()).Str("token", event.Token.Hex()).Str("amount", event.Amount.String()).Msg("Event decoded successfully")
 	
 	eventModel := &model.Events{
 		BlockNumber: log.BlockNumber,
@@ -41,20 +41,20 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 	collateral := &model.Redeem{
 		ID:                uuid.New().String(),
 		EventID:           eventModel.ID,
-		UserAddress:       event.From.Hex(),
+		UserAddress:       event.User.Hex(),
 		CollateralAddress: event.Token.Hex(),
 		Amount:            model.NewBigInt(event.Amount),
 	}
 
 	err = storage.GetCollateralStore().CreateRedeem(context.Background(), collateral)
 	if err != nil {
-		logger.Error().Err(err).Str("user", event.From.Hex()).Msg("Failed to create redeem record")
+		logger.Error().Err(err).Str("user", event.User.Hex()).Msg("Failed to create redeem record")
 		return
 	}
 	logger.Debug().Str("redeem_id", collateral.ID).Msg("Redeem record created")
 
 	metric := model.Metrics{
-		UserAddress: event.From,
+		UserAddress: event.User,
 		Amount:      event.Amount,
 		Asset:       model.CollateralAsset,
 		Operation:   model.Subtraction,
@@ -62,24 +62,18 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 	}
 
 	metricsChan <- metric
-	logger.Info().Str("user", event.From.Hex()).Str("token", event.Token.Hex()).Str("amount", event.Amount.String()).Msg("Collateral redeemed event processed and metric sent to channel")
+	logger.Info().Str("user", event.User.Hex()).Str("token", event.Token.Hex()).Str("amount", event.Amount.String()).Msg("Collateral redeemed event processed and metric sent to channel")
 }
 
 func decodeEventData(log types.Log) *model.CollateralRedeemedEvent {
+	if len(log.Topics) < 4 {
+		return nil
+	}
+
 	event := &model.CollateralRedeemedEvent{}
-
-	abi, err := blockchain.GetABI()
-	if err != nil {
-		return nil
-	}
-
-	err = abi.UnpackIntoInterface(event, "CollateralRedeemed", log.Data)
-	if err != nil {
-		return nil
-	}
-
-	event.From = common.HexToAddress(log.Topics[1].Hex())
-	event.To = common.HexToAddress(log.Topics[2].Hex())
+	event.User = common.HexToAddress(log.Topics[1].Hex())
+	event.Token = common.HexToAddress(log.Topics[2].Hex())
+	event.Amount = new(big.Int).SetBytes(log.Topics[3].Bytes())
 
 	return event
 }
