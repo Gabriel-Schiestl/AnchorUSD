@@ -8,38 +8,53 @@ import (
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model/constants"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
 )
 
 func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) {
+	logger := utils.GetLogger()
+	logger.Info().Str("user", metric.UserAddress.Hex()).Str("token", metric.CollateralTokenAddress.Hex()).Str("amount", metric.Amount.String()).Str("operation", string(metric.Operation)).Msg("Processing collateral metric")
+
 	amountToChange := getAmountChange(metric)
+	logger.Debug().Str("amount_to_change", amountToChange.String()).Msg("Calculated amount to change")
 
 	collateralKey := "collateral:" + metric.CollateralTokenAddress.Hex()
 
 	cacheStore.HAdd(collateralKey, metric.UserAddress.Hex(), amountToChange)
+	logger.Debug().Str("key", collateralKey).Str("user", metric.UserAddress.Hex()).Msg("Updated user collateral balance")
 
 	getCollateralUSDAmount, err := getCollateralUSDAmount(metric, priceFeed, priceStore, cacheStore)
 	if err != nil {
+		logger.Error().Err(err).Str("user", metric.UserAddress.Hex()).Msg("Failed to get collateral USD amount")
 		return
 	}
+	logger.Debug().Str("user", metric.UserAddress.Hex()).Str("collateral_usd", getCollateralUSDAmount.String()).Msg("Calculated total collateral USD value")
 
 	debt, err := cacheStore.HGet("user:debt", metric.UserAddress.Hex())
 	if err != nil {
+		logger.Error().Err(err).Str("user", metric.UserAddress.Hex()).Msg("Failed to get user debt")
 		return
 	}
 
 	usdAmountToChange, err := getUSDAmountToChange(metric, priceFeed, priceStore)
 	if err != nil {
+		logger.Error().Err(err).Str("user", metric.UserAddress.Hex()).Msg("Failed to get USD amount to change")
 		return
 	}
+	logger.Debug().Str("usd_change", usdAmountToChange.String()).Msg("Calculated USD amount to change")
 
 	debtBigInt := big.NewInt(0)
 	debtBigInt.SetString(debt, 10)
+
+	logger.Debug().Str("user", metric.UserAddress.Hex()).Str("collateral_usd", getCollateralUSDAmount.String()).Str("debt", debt).Msg("Calculating health factor")
 
 	healthFactor := domain.CalculateHealthFactor(getCollateralUSDAmount, debtBigInt)
 
 	cacheStore.HAdd("collateral", "total_supply", usdAmountToChange)
 	cacheStore.HSet("user:collateral_usd", metric.UserAddress.Hex(), getCollateralUSDAmount.String())
 	cacheStore.HSet("user:health_factor", metric.UserAddress.Hex(), healthFactor.String())
+
+	logger.Info().Str("user", metric.UserAddress.Hex()).Str("health_factor", healthFactor.String()).Str("collateral_usd", getCollateralUSDAmount.String()).Msg("Collateral metric processed and health factor updated")
 }
 
 func getUSDAmountToChange(metric model.Metrics, priceFeed external.IPriceFeedAPI, priceStore storage.IPriceStore) (*big.Int, error) {

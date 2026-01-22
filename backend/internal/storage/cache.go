@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
 	"github.com/go-redis/redis"
 )
 
@@ -47,6 +48,8 @@ type ICacheStore interface {
 }
 
 func NewCacheStore(config CacheConfig) *CacheStore {
+	logger := utils.GetLogger()
+	logger.Info().Str("address", config.GetAddress()).Msg("Initializing cache store with Redis")
 	return &CacheStore{
 		Client: redis.NewClient(&redis.Options{
 			Addr:     config.GetAddress(),

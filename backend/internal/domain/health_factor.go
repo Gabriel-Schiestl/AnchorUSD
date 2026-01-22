@@ -36,3 +36,18 @@ func CalculateHealthFactorAfterDeposit(currentCollateralUSD, currentDebt, deposi
 	newCollateralUSD := new(big.Int).Add(currentCollateralUSD, depositAmountUSD)
 	return CalculateHealthFactor(newCollateralUSD, currentDebt)
 }
+
+func AverageHealthFactor(sumHF *big.Int, totalUsers int) float64 {
+	if totalUsers == 0 {
+		return 0.0
+	}
+	avg := new(big.Int).Div(new(big.Int).Set(sumHF), big.NewInt(int64(totalUsers)))
+	return float64(avg.Int64()) / float64(constants.PRECISION.Int64())
+}
+
+func IsAtRisk(hf *big.Int) bool {
+	if hf == nil {
+		return false
+	}
+	return hf.Cmp(constants.RISK_THRESHOLD) < 0
+}
