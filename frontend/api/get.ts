@@ -9,7 +9,7 @@ export interface HistoryData {
 
 export interface LiquidatableUser {
   address: string;
-  healthFactor: number;
+  healthFactor: string;
   collateralUsd: string;
   debtUsd: string;
   liquidationAmount: string;

@@ -19,13 +19,18 @@ import {
   getHealthFactorStatus,
   getHealthPercent,
 } from "@/domain/healthFactor";
+import { formatFromWei, formatFromWeiPrecise } from "@/lib/utils";
 import { ConnectWalletPrompt } from "@/components/connect-wallet-prompt";
 
 export function UserDashboard() {
-  const { isConnected } = useAccount();
-  const { data, isLoading } = useSWR("/dashboard", get<DashboardData>, {
-    fallbackData: mockDashboardData,
-  });
+  const { isConnected, address } = useAccount();
+  const { data, isLoading } = useSWR(
+    address && isConnected ? `/api/user/${address}` : null,
+    () => get<DashboardData>(`/api/user/${address}`),
+    {
+      fallbackData: mockDashboardData,
+    },
+  );
 
   if (!isConnected) {
     return (
@@ -53,10 +58,10 @@ export function UserDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              ${data.collateral.total}
+              ${formatFromWeiPrecise(data.collateral_value_usd, 18, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
-              ${data.collateral.available} available
+              Deposited collateral value
             </p>
           </CardContent>
         </Card>
@@ -70,7 +75,7 @@ export function UserDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              ${data.debt}
+              ${formatFromWeiPrecise(data.total_debt, 18, 2)}
             </div>
             <p className="text-xs text-muted-foreground">AUSD minted</p>
           </CardContent>
@@ -82,19 +87,19 @@ export function UserDashboard() {
               Health Factor
             </CardTitle>
             <HeartPulse
-              className={`h-4 w-4 ${getHealthFactorColor(data.healthFactor)}`}
+              className={`h-4 w-4 ${getHealthFactorColor(parseFloat(formatFromWei(data.current_health_factor)))}`}
             />
           </CardHeader>
           <CardContent>
             <div
               className={`text-2xl font-bold ${getHealthFactorColor(
-                data.healthFactor
+                parseFloat(formatFromWei(data.current_health_factor)),
               )}`}
             >
-              {data.healthFactor.toFixed(2)}
+              {parseFloat(formatFromWei(data.current_health_factor)).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {getHealthFactorStatus(data.healthFactor)}
+              {getHealthFactorStatus(parseFloat(formatFromWei(data.current_health_factor)))}
             </p>
           </CardContent>
         </Card>
@@ -114,7 +119,7 @@ export function UserDashboard() {
             <span className="text-sm text-muted-foreground">Healthy</span>
           </div>
           <Progress
-            value={getHealthPercent(data.healthFactor)}
+            value={getHealthPercent(parseFloat(formatFromWei(data.current_health_factor)))}
             className="h-3"
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -127,22 +132,39 @@ export function UserDashboard() {
         </CardContent>
       </Card>
 
-      {/* Balance Table */}
+      {/* Max Mintable Card */}
       <Card className="border-border bg-card">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-foreground">
             <Wallet className="h-5 w-5 text-primary" />
-            Collateral Amount by Asset
+            Maximum Mintable AUSD
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {data.collateralDeposited.map(
-              (balance: {
-                asset: string;
-                amount: string;
-                valueUsd: string;
-              }) => (
+          <div className="rounded-lg border border-border bg-secondary/30 p-4">
+            <p className="text-sm text-muted-foreground">You can mint up to</p>
+            <p className="mt-2 text-3xl font-bold text-primary">
+              ${formatFromWeiPrecise(data.max_mintable, 18, 2)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              AUSD based on your current collateral
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Collateral Amount by Asset */}
+      {data.collateral_deposited && data.collateral_deposited.length > 0 && (
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Shield className="h-5 w-5 text-primary" />
+              Collateral Amount by Asset
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {data.collateral_deposited.map((balance) => (
                 <div
                   key={balance.asset}
                   className="flex items-center justify-between rounded-lg border border-border bg-secondary/30 p-4"
@@ -150,11 +172,11 @@ export function UserDashboard() {
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
                       <span className="font-mono text-lg text-primary">
-                        {balance.asset === "WETH"
+                        {balance.asset === "ETH"
                           ? "Ξ"
-                          : balance.asset === "WBTC"
-                          ? "₿"
-                          : "$"}
+                          : balance.asset === "BTC"
+                            ? "₿"
+                            : "$"}
                       </span>
                     </div>
                     <div>
@@ -162,21 +184,21 @@ export function UserDashboard() {
                         {balance.asset}
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {balance.amount}
+                        {formatFromWeiPrecise(balance.amount, 18, 4)}
                       </p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="font-mono font-medium text-foreground">
-                      ${balance.valueUsd}
+                      ${formatFromWeiPrecise(balance.valueUsd, 18, 2)}
                     </p>
                   </div>
                 </div>
-              )
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

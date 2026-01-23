@@ -39,8 +39,8 @@ function TransactionItem({ tx }: { tx: Transaction }) {
               {tx.status === "completed"
                 ? "Completed"
                 : tx.status === "pending"
-                ? "Pending"
-                : "Failed"}
+                  ? "Pending"
+                  : "Failed"}
             </Badge>
           </div>
           <p className="text-sm text-muted-foreground">
@@ -70,10 +70,14 @@ function TransactionItem({ tx }: { tx: Transaction }) {
 }
 
 export function HistoryList() {
-  const { isConnected } = useAccount();
-  const { data, isLoading } = useSWR("/history", get<HistoryData>, {
-    fallbackData: mockHistoryData,
-  });
+  const { isConnected, address } = useAccount();
+  const { data, isLoading } = useSWR(
+    address && isConnected ? `/api/history/${address}` : null,
+    () => get<HistoryData>(`/api/history/${address}`),
+    {
+      fallbackData: mockHistoryData,
+    },
+  );
 
   if (!isConnected) {
     return (

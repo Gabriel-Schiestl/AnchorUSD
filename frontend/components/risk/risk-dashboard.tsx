@@ -21,9 +21,13 @@ import { getHealthFactorColor } from "@/domain/healthFactor";
 
 export function RiskDashboard() {
   const { isConnected } = useAccount();
-  const { data, isLoading } = useSWR("/risk", get<MetricsData>, {
-    fallbackData: mockRiskData,
-  });
+  const { data, isLoading } = useSWR(
+    isConnected ? `/api/metrics/dashboard` : null,
+    () => get<MetricsData>(`/api/metrics/dashboard`),
+    {
+      fallbackData: mockRiskData,
+    },
+  );
 
   if (!isConnected) {
     return (
@@ -149,7 +153,7 @@ export function RiskDashboard() {
                 </div>
                 <Progress value={item.percentage} className="h-2" />
               </div>
-            )
+            ),
           )}
         </CardContent>
       </Card>
@@ -190,10 +194,10 @@ export function RiskDashboard() {
                   <div className="text-right">
                     <p
                       className={`font-mono font-bold ${getHealthFactorColor(
-                        user.healthFactor
+                        parseFloat(user.healthFactor),
                       )}`}
                     >
-                      HF: {user.healthFactor.toFixed(2)}
+                      HF: {parseFloat(user.healthFactor).toFixed(2)}
                     </p>
                     <p className="text-xs text-destructive">
                       Liquidatable: ${user.liquidationAmount}

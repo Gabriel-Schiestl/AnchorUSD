@@ -2,22 +2,27 @@ package service
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/domain"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/http/external"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model/constants"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
 )
 
 type userDataService struct {
-	Store storage.ICacheStore
+	Store     storage.ICacheStore
+	PriceFeed external.IPriceFeedAPI
 }
 
-func NewUserDataService(store storage.ICacheStore) *userDataService {
+func NewUserDataService(store storage.ICacheStore, priceFeed external.IPriceFeedAPI) *userDataService {
 	logger := utils.GetLogger()
 	logger.Info().Msg("Initializing user data service")
 	return &userDataService{
-		Store: store,
+		Store:     store,
+		PriceFeed: priceFeed,
 	}
 }
 
@@ -47,15 +52,62 @@ func (s *userDataService) GetUserData(ctx context.Context, user string) (model.U
 
 	maxMintable := domain.CalculateMaxMintable(collateralValueUSD, totalDebt)
 
+	collateralAssets := s.fetchCollateralAssets(user)
+
+	collateralDeposited := domain.CalculateCollateralDeposited(collateralAssets)
+
 	userData := model.UserData{
 		TotalDebt:           totalDebt,
 		CollateralValueUSD:  collateralValueUSD,
 		MaxMintable:         maxMintable,
 		CurrentHealthFactor: healthFactor,
+		CollateralDeposited: collateralDeposited,
 	}
 
-	logger.Info().Str("user", user).Str("max_mintable", maxMintable).Msg("User data retrieved successfully")
+	logger.Info().Str("user", user).Str("max_mintable", maxMintable).Int("collateral_assets", len(collateralDeposited)).Msg("User data retrieved successfully")
 
 	return userData, nil
 }
 
+func (s *userDataService) fetchCollateralAssets(user string) []domain.CollateralAssetData {
+	logger := utils.GetLogger()
+	assets := []domain.CollateralAssetData{}
+
+	ethPrice, _ := s.PriceFeed.GetEthUsdPrice()
+	btcPrice, _ := s.PriceFeed.GetBtcUsdPrice()
+
+	for name, tokenAddress := range constants.CollateralTokens {
+		collateralKey := "collateral:" + tokenAddress
+
+		amountStr, err := s.Store.HGet(collateralKey, user)
+		if err != nil {
+			logger.Debug().Err(err).Str("user", user).Str("asset", name).Msg("No collateral found for this asset")
+			continue
+		}
+
+		amount := new(big.Int)
+		if _, ok := amount.SetString(amountStr, 10); !ok {
+			logger.Warn().Str("user", user).Str("asset", name).Str("amount", amountStr).Msg("Failed to parse collateral amount")
+			continue
+		}
+
+		var priceStr string
+		switch name {
+		case "ETH":
+			priceStr = ethPrice
+		case "BTC":
+			priceStr = btcPrice
+		default:
+			logger.Debug().Str("asset", name).Msg("Unknown asset type, skipping")
+			continue
+		}
+
+		assets = append(assets, domain.CollateralAssetData{
+			Name:     name,
+			Amount:   amount,
+			PriceUSD: priceStr,
+		})
+	}
+
+	return assets
+}

@@ -4,21 +4,21 @@ export const mockRiskData: MetricsData = {
   liquidatableUsers: [
     {
       address: "0x1234...5678",
-      healthFactor: 0.95,
+      healthFactor: "0.95",
       collateralUsd: "4,200.00",
       debtUsd: "4,500.00",
       liquidationAmount: "300.00",
     },
     {
       address: "0xabcd...ef01",
-      healthFactor: 0.88,
+      healthFactor: "0.88",
       collateralUsd: "8,500.00",
       debtUsd: "9,800.00",
       liquidationAmount: "1,300.00",
     },
     {
       address: "0x9876...fedc",
-      healthFactor: 0.92,
+      healthFactor: "0.92",
       collateralUsd: "2,100.00",
       debtUsd: "2,300.00",
       liquidationAmount: "200.00",

@@ -33,6 +33,7 @@ import {
 import { useWalletBalance } from "@/hooks/useWalletBalance";
 import { useAUSDEngine } from "@/hooks/useAUSDEngine";
 import { collateralAssets, TOKEN_ADDRESSES } from "@/lib/constants";
+import { formatFromWei, formatFromWeiPrecise } from "@/lib/utils";
 
 export function MintBurnDeposit() {
   const { isConnected } = useAccount();
@@ -104,6 +105,8 @@ export function MintBurnDeposit() {
     setIsLoading(true);
     try {
       // Implement logic to interact with smart contracts here
+      // If deposit, call approve function for the selected asset first
+
       await new Promise((resolve) => setTimeout(resolve, 2000));
 
       await Promise.all([
@@ -318,9 +321,8 @@ export function MintBurnDeposit() {
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
                   ) : (
-                    `$${
-                      engineData?.collateralValueUSD
-                        ? parseFloat(engineData.collateralValueUSD).toFixed(2)
+                    `$${engineData?.collateral_value_usd
+                        ? formatFromWeiPrecise(engineData.collateral_value_usd, 18, 2)
                         : "0.00"
                     }`
                   )}
@@ -334,9 +336,8 @@ export function MintBurnDeposit() {
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
                   ) : (
-                    `$${
-                      engineData?.maxMintable
-                        ? parseFloat(engineData.maxMintable).toFixed(2)
+                    `$${engineData?.max_mintable
+                        ? formatFromWeiPrecise(engineData.max_mintable, 18, 2)
                         : "0.00"
                     }`
                   )}
@@ -349,8 +350,8 @@ export function MintBurnDeposit() {
                 <span className="font-mono text-foreground">
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
-                  ) : engineData?.currentHealthFactor ? (
-                    parseFloat(engineData.currentHealthFactor).toFixed(2)
+                  ) : engineData?.current_health_factor ? (
+                    parseFloat(formatFromWei(engineData.current_health_factor)).toFixed(2)
                   ) : (
                     "N/A"
                   )}
@@ -394,7 +395,7 @@ export function MintBurnDeposit() {
                 !amount ||
                 isLoading ||
                 !engineData ||
-                parseFloat(amount) > parseFloat(engineData.maxMintable || "0")
+                parseFloat(amount) > parseFloat(formatFromWei(engineData.max_mintable || "0"))
               }
             >
               {isLoading ? (
@@ -461,8 +462,8 @@ export function MintBurnDeposit() {
                     <Loader2 className="h-3 w-3 animate-spin inline" />
                   ) : (
                     `${
-                      engineData?.totalDebt
-                        ? parseFloat(engineData.totalDebt).toFixed(2)
+                      engineData?.total_debt
+                        ? formatFromWeiPrecise(engineData.total_debt, 18, 2)
                         : "0.00"
                     } AUSD`
                   )}
@@ -475,8 +476,8 @@ export function MintBurnDeposit() {
                 <span className="font-mono text-foreground">
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
-                  ) : engineData?.currentHealthFactor ? (
-                    parseFloat(engineData.currentHealthFactor).toFixed(2)
+                  ) : engineData?.current_health_factor ? (
+                    parseFloat(formatFromWei(engineData.current_health_factor)).toFixed(2)
                   ) : (
                     "N/A"
                   )}
@@ -522,7 +523,7 @@ export function MintBurnDeposit() {
                 isLoading ||
                 parseFloat(amount) > parseFloat(ausdBalance) ||
                 !engineData ||
-                parseFloat(amount) > parseFloat(engineData.totalDebt || "0")
+                parseFloat(amount) > parseFloat(formatFromWei(engineData.total_debt || "0"))
               }
             >
               {isLoading ? (

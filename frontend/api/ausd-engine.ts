@@ -1,12 +1,18 @@
 import { get } from "./get";
 import { post } from "./post";
 
+export interface CollateralDeposited {
+  asset: string;
+  amount: string;
+  valueUsd: string;
+}
+
 export interface AUSDEngineData {
-  ausdBalance: string;
-  totalDebt: string;
-  collateralValueUSD: string;
-  maxMintable: string;
-  currentHealthFactor: string;
+  total_debt: string;
+  collateral_value_usd: string;
+  max_mintable: string;
+  current_health_factor: string;
+  collateral_deposited: CollateralDeposited[];
 }
 
 export interface HealthFactorProjection {
@@ -33,37 +39,37 @@ interface CalculateDepositRequest {
 
 export const ausdEngineApi = {
   getUserData: async (address: string): Promise<AUSDEngineData> => {
-    return get<AUSDEngineData>(`/api/ausd-engine/user/${address}`);
+    return get<AUSDEngineData>(`/api/user/${address}`);
   },
 
   calculateHealthFactorAfterMint: async (
     address: string,
-    mintAmount: string
+    mintAmount: string,
   ): Promise<HealthFactorProjection> => {
     return post<HealthFactorProjection, CalculateMintRequest>(
       `/api/ausd-engine/calculate-mint`,
-      { address, mintAmount }
+      { address, mintAmount },
     );
   },
 
   calculateHealthFactorAfterBurn: async (
     address: string,
-    burnAmount: string
+    burnAmount: string,
   ): Promise<HealthFactorProjection> => {
     return post<HealthFactorProjection, CalculateBurnRequest>(
       `/api/ausd-engine/calculate-burn`,
-      { address, burnAmount }
+      { address, burnAmount },
     );
   },
 
   calculateHealthFactorAfterDeposit: async (
     address: string,
     tokenAddress: string,
-    depositAmount: string
+    depositAmount: string,
   ): Promise<HealthFactorProjection> => {
     return post<HealthFactorProjection, CalculateDepositRequest>(
       `/api/ausd-engine/calculate-deposit`,
-      { address, tokenAddress, depositAmount }
+      { address, tokenAddress, depositAmount },
     );
   },
 };

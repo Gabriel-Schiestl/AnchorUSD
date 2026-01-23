@@ -59,13 +59,13 @@ func main() {
 	metricsService := service.NewMetricsService(metricsStore)
 	logger.Info().Msg("Metrics service ready")
 
-	logger.Info().Msg("Initializing user data service")
-	userDataService := service.NewUserDataService(cacheStore)
-	logger.Info().Msg("User data service ready")
-
 	logger.Info().Msg("Initializing price feed API")
 	priceFeed := external.NewPriceFeedAPI()
 	logger.Info().Msg("Price feed API initialized")
+
+	logger.Info().Msg("Initializing user data service")
+	userDataService := service.NewUserDataService(cacheStore, priceFeed)
+	logger.Info().Msg("User data service ready")
 
 	logger.Info().Msg("Initializing health factor calculation service")
 	healthFactorCalcService := service.NewHealthFactorCalculationService(cacheStore, priceFeed)
