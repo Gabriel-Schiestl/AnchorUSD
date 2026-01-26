@@ -8,7 +8,7 @@ import (
 
 func CalculateHealthFactor(collateralValueUSD, debtValueUSD *big.Int) *big.Int {
 	if debtValueUSD.Sign() == 0 {
-		return big.NewInt(0).Set(constants.PRECISION)
+		return big.NewInt(0).Set(constants.MAX_HEALTH_FACTOR)
 	}
 
 	collateralAdjusted := big.NewInt(0).Mul(collateralValueUSD, constants.LIQUIDATION_THRESHOLD)

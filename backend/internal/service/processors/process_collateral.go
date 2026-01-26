@@ -1,6 +1,7 @@
 package processors
 
 import (
+	"fmt"
 	"math/big"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/domain"
@@ -25,6 +26,8 @@ func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, pri
 
 	getCollateralUSDAmount, err := getCollateralUSDAmount(metric, priceFeed, priceStore, cacheStore)
 	if err != nil {
+
+		fmt.Println("Error getting collateral USD amount:", err)
 		logger.Error().Err(err).Str("user", metric.UserAddress.Hex()).Msg("Failed to get collateral USD amount")
 		return
 	}
@@ -32,8 +35,11 @@ func ProcessCollateral(metric model.Metrics, cacheStore storage.ICacheStore, pri
 
 	debt, err := cacheStore.HGet("user:debt", metric.UserAddress.Hex())
 	if err != nil {
-		logger.Error().Err(err).Str("user", metric.UserAddress.Hex()).Msg("Failed to get user debt")
-		return
+		if debt != "" {
+			logger.Error().Err(err).Str("user", metric.UserAddress.Hex()).Msg("Failed to get user debt")
+			return
+		}
+		debt = "0"
 	}
 
 	usdAmountToChange, err := getUSDAmountToChange(metric, priceFeed, priceStore)
@@ -102,7 +108,10 @@ func getCollateralUSDAmount(metric model.Metrics, priceFeed external.IPriceFeedA
 		collateralKey := "collateral:" + token
 		tokenAmount, err := cacheStore.HGet(collateralKey, metric.UserAddress.Hex())
 		if err != nil {
-			return nil, err
+			if tokenAmount != "" {
+				return nil, err
+			}
+			tokenAmount = "0"
 		}
 
 		tokenAmountBigInt := big.NewInt(0)
