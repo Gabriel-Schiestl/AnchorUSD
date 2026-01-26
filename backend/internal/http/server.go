@@ -11,6 +11,7 @@ func init() {
 	logger := utils.GetLogger()
 	logger.Info().Msg("Initializing Gin HTTP server")
 	server = gin.Default()
+	server.Use(CORSMiddleware())
 }
 
 func Run(addr string) error {

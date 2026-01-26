@@ -107,6 +107,6 @@ func main() {
 	http.RegisterRoutes(metricsService, userDataService, healthFactorCalcService, dashboardMetricsService, historyService)
 	logger.Info().Msg("HTTP routes registered")
 
-	logger.Info().Str("address", ":8080").Msg("Starting HTTP server")
-	http.Run(":8080")
+	logger.Info().Str("address", ":3000").Msg("Starting HTTP server")
+	http.Run(":3000")
 }
