@@ -7,7 +7,6 @@ import (
 )
 
 func RegisterRoutes(
-	svc handlers.MetricsReader,
 	userDataSvc handlers.UserReader,
 	hfCalcSvc handlers.HealthFactorCalculator,
 	dashboardMetricsSvc handlers.DashboardMetricsReader,
@@ -23,13 +22,6 @@ func RegisterRoutes(
 		c.JSON(200, gin.H{"status": "ok"})
 	})
 	logger.Debug().Msg("Registered /api/status route")
-	
-	metrics := api.Group("/metrics")
-	{
-		metrics.GET("", handlers.GetMetricsHandler(svc))
-		metrics.GET("/dashboard", handlers.GetDashboardMetricsHandler(dashboardMetricsSvc))
-	}
-	logger.Debug().Msg("Registered /api/metrics routes")
 
 	api.GET("/user/:user", handlers.GetUserDataHandler(userDataSvc))
 	logger.Debug().Msg("Registered /api/user/:user route")

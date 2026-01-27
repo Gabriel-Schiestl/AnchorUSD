@@ -32,21 +32,22 @@ import {
 } from "lucide-react";
 import { useWalletBalance } from "@/hooks/useWalletBalance";
 import { useAUSDEngine } from "@/hooks/useAUSDEngine";
+import { useAUSDEngineOperations } from "@/hooks/useAUSDEngineOperations";
 import { collateralAssets, TOKEN_ADDRESSES } from "@/lib/constants";
 import { formatFromWei, formatFromWeiPrecise } from "@/lib/utils";
+import { toast } from "sonner";
 
 export function MintBurnDeposit() {
   const { isConnected } = useAccount();
   const [activeTab, setActiveTab] = useState("deposit");
   const [selectedAsset, setSelectedAsset] = useState("WETH");
   const [amount, setAmount] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
   const [healthFactorProjection, setHealthFactorProjection] = useState<
     string | null
   >(null);
 
   const selectedTokenAddress = collateralAssets.find(
-    (asset) => asset.symbol === selectedAsset
+    (asset) => asset.symbol === selectedAsset,
   )?.address;
 
   const {
@@ -67,6 +68,58 @@ export function MintBurnDeposit() {
     calculateHealthFactorAfterDeposit,
   } = useAUSDEngine();
 
+  const {
+    depositCollateral,
+    mintAUSD,
+    burnAUSD,
+    redeemCollateral,
+    isProcessing,
+    isWritePending,
+    isConfirming,
+    isConfirmed,
+    currentOperation,
+    transactionHash,
+    error: txError,
+    needsApproval,
+  } = useAUSDEngineOperations();
+
+  useEffect(() => {
+    if (isConfirmed && transactionHash) {
+      toast.success("Transaction confirmed!", {
+        description: `Hash: ${transactionHash.slice(0, 10)}...${transactionHash.slice(-8)}`,
+      });
+
+      Promise.all([
+        refreshAssetBalance(),
+        refreshAusdBalance(),
+        refreshEngineData(),
+      ]);
+
+      setAmount("");
+      setHealthFactorProjection(null);
+    }
+  }, [isConfirmed, transactionHash]);
+
+  useEffect(() => {
+    if (needsApproval) {
+      toast.info("Approval required", {
+        description:
+          "Click the button again after the approval is confirmed to continue",
+        duration: 5000,
+      });
+    }
+  }, [needsApproval]);
+
+  useEffect(() => {
+    if (txError) {
+      toast.error("Transaction error", {
+        description:
+          txError.message ||
+          "An error occurred while processing the transaction",
+      });
+    }
+  }, [txError]);
+
   useEffect(() => {
     const updateHealthFactorProjection = async () => {
       if (!amount || isNaN(parseFloat(amount))) {
@@ -84,7 +137,7 @@ export function MintBurnDeposit() {
         } else if (activeTab === "deposit" && selectedTokenAddress) {
           projection = await calculateHealthFactorAfterDeposit(
             selectedTokenAddress,
-            amount
+            amount,
           );
         }
 
@@ -102,25 +155,57 @@ export function MintBurnDeposit() {
   }, [amount, activeTab, selectedTokenAddress]);
 
   const handleSubmit = async (action: string) => {
-    setIsLoading(true);
+    if (!amount || parseFloat(amount) <= 0) {
+      toast.error("Invalid value", {
+        description: "Please enter a valid amount",
+      });
+      return;
+    }
+
     try {
-      // Implement logic to interact with smart contracts here
-      // If deposit, call approve function for the selected asset first
+      toast.info("Preparing transaction...", {
+        description: currentOperation || "Please wait...",
+      });
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      switch (action) {
+        case "deposit":
+          if (!selectedTokenAddress) {
+            toast.error("Select an asset");
+            return;
+          }
+          await depositCollateral(selectedTokenAddress, amount);
+          break;
 
-      await Promise.all([
-        refreshAssetBalance(),
-        refreshAusdBalance(),
-        refreshEngineData(),
-      ]);
+        case "mint":
+          await mintAUSD(amount);
+          break;
 
-      setAmount("");
-      setHealthFactorProjection(null);
-    } catch (error) {
+        case "burn":
+          await burnAUSD(amount);
+          break;
+
+        case "redeem":
+          if (!selectedTokenAddress) {
+            toast.error("Select an asset");
+            return;
+          }
+          await redeemCollateral(selectedTokenAddress, amount);
+          break;
+
+        default:
+          throw new Error("Invalid action");
+      }
+
+      toast.info("Waiting for confirmation...", {
+        description: "Please confirm the transaction in your wallet",
+      });
+    } catch (error: any) {
       console.error(`Error during ${action}:`, error);
-    } finally {
-      setIsLoading(false);
+      if (error.message !== "Approval denied") {
+        toast.error("Error", {
+          description: error.message || `Error executing ${action}`,
+        });
+      }
     }
   };
 
@@ -255,7 +340,9 @@ export function MintBurnDeposit() {
                     Health Factor after deposit:
                   </span>
                   <span className="font-mono font-semibold text-primary">
-                    {parseFloat(healthFactorProjection).toFixed(2)}
+                    {parseFloat(formatFromWei(healthFactorProjection)).toFixed(
+                      2,
+                    )}
                   </span>
                 </div>
               </div>
@@ -266,14 +353,17 @@ export function MintBurnDeposit() {
               onClick={() => handleSubmit("deposit")}
               disabled={
                 !amount ||
-                isLoading ||
+                isProcessing ||
+                isWritePending ||
+                isConfirming ||
                 parseFloat(amount) > parseFloat(assetBalance)
               }
             >
-              {isLoading ? (
+              {isProcessing || isWritePending || isConfirming ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  {currentOperation ||
+                    (isConfirming ? "Confirmando..." : "Processando...")}
                 </>
               ) : (
                 <>
@@ -321,8 +411,13 @@ export function MintBurnDeposit() {
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
                   ) : (
-                    `$${engineData?.collateral_value_usd
-                        ? formatFromWeiPrecise(engineData.collateral_value_usd, 18, 2)
+                    `$${
+                      engineData?.collateral_value_usd
+                        ? formatFromWeiPrecise(
+                            engineData.collateral_value_usd,
+                            8,
+                            2,
+                          )
                         : "0.00"
                     }`
                   )}
@@ -336,8 +431,11 @@ export function MintBurnDeposit() {
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
                   ) : (
-                    `$${engineData?.max_mintable
-                        ? formatFromWeiPrecise(engineData.max_mintable, 18, 2)
+                    `$${
+                      engineData?.max_mintable
+                        ? parseFloat(
+                            formatFromWei(engineData.max_mintable),
+                          ).toFixed(2)
                         : "0.00"
                     }`
                   )}
@@ -351,7 +449,9 @@ export function MintBurnDeposit() {
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
                   ) : engineData?.current_health_factor ? (
-                    parseFloat(formatFromWei(engineData.current_health_factor)).toFixed(2)
+                    parseFloat(
+                      formatFromWei(engineData.current_health_factor),
+                    ).toFixed(2)
                   ) : (
                     "N/A"
                   )}
@@ -382,26 +482,32 @@ export function MintBurnDeposit() {
                     Health Factor after mint:
                   </span>
                   <span className="font-mono font-semibold text-primary">
-                    {parseFloat(healthFactorProjection).toFixed(2)}
+                    {parseFloat(formatFromWei(healthFactorProjection)).toFixed(
+                      2,
+                    )}
                   </span>
                 </div>
               </div>
             )}
             <Button
-              className="w-full"
+              className="w-full hover:cursor-pointer"
               size="lg"
               onClick={() => handleSubmit("mint")}
               disabled={
                 !amount ||
-                isLoading ||
+                isProcessing ||
+                isWritePending ||
+                isConfirming ||
                 !engineData ||
-                parseFloat(amount) > parseFloat(formatFromWei(engineData.max_mintable || "0"))
+                parseFloat(amount) >
+                  parseFloat(formatFromWei(engineData.max_mintable || "0"))
               }
             >
-              {isLoading ? (
+              {isProcessing || isWritePending || isConfirming ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  {currentOperation ||
+                    (isConfirming ? "Confirmando..." : "Processando...")}
                 </>
               ) : (
                 <>
@@ -477,7 +583,9 @@ export function MintBurnDeposit() {
                   {isLoadingEngine ? (
                     <Loader2 className="h-3 w-3 animate-spin inline" />
                   ) : engineData?.current_health_factor ? (
-                    parseFloat(formatFromWei(engineData.current_health_factor)).toFixed(2)
+                    parseFloat(
+                      formatFromWei(engineData.current_health_factor),
+                    ).toFixed(2)
                   ) : (
                     "N/A"
                   )}
@@ -508,7 +616,9 @@ export function MintBurnDeposit() {
                     Health Factor after burn:
                   </span>
                   <span className="font-mono font-semibold text-primary">
-                    {parseFloat(healthFactorProjection).toFixed(2)}
+                    {parseFloat(formatFromWei(healthFactorProjection)).toFixed(
+                      2,
+                    )}
                   </span>
                 </div>
               </div>
@@ -520,16 +630,20 @@ export function MintBurnDeposit() {
               onClick={() => handleSubmit("burn")}
               disabled={
                 !amount ||
-                isLoading ||
+                isProcessing ||
+                isWritePending ||
+                isConfirming ||
                 parseFloat(amount) > parseFloat(ausdBalance) ||
                 !engineData ||
-                parseFloat(amount) > parseFloat(formatFromWei(engineData.total_debt || "0"))
+                parseFloat(amount) >
+                  parseFloat(formatFromWei(engineData.total_debt || "0"))
               }
             >
-              {isLoading ? (
+              {isProcessing || isWritePending || isConfirming ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Processing...
+                  {currentOperation ||
+                    (isConfirming ? "Confirmando..." : "Processando...")}
                 </>
               ) : (
                 <>

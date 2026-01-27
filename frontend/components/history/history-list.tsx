@@ -19,6 +19,7 @@ import { mockHistoryData } from "@/api/mocks/history";
 import { formatDate } from "@/lib/date";
 import { typeConfig } from "@/models/TypeConfig";
 import { ConnectWalletPrompt } from "@/components/connect-wallet-prompt";
+import { formatFromWeiPrecise } from "@/lib/utils";
 
 function TransactionItem({ tx }: { tx: Transaction }) {
   const config = typeConfig[tx.type];
@@ -52,7 +53,7 @@ function TransactionItem({ tx }: { tx: Transaction }) {
         <div className="text-right">
           <p className="font-mono font-medium text-foreground">
             {tx.type === "burn" ? "-" : "+"}
-            {tx.amount} {tx.asset}
+            {formatFromWeiPrecise(tx.amount, 18, 6)} {tx.asset}
           </p>
           <a
             href={`https://etherscan.io/tx/${tx.txHash}`}

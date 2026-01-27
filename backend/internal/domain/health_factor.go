@@ -8,15 +8,15 @@ import (
 
 func CalculateHealthFactor(collateralValueUSD, debtValueUSD *big.Int) *big.Int {
 	if debtValueUSD.Sign() == 0 {
-		return big.NewInt(0).Set(constants.MAX_HEALTH_FACTOR)
+		return big.NewInt(0).Mul(collateralValueUSD, constants.ADDITIONAL_PRICE_PRECISION)
 	}
 
 	collateralAdjusted := big.NewInt(0).Mul(collateralValueUSD, constants.LIQUIDATION_THRESHOLD)
 	collateralAdjusted.Div(collateralAdjusted, constants.LIQUIDATION_PRECISION)
-	healthFactor := big.NewInt(0).Mul(collateralAdjusted, constants.PRECISION)
+	healthFactor := big.NewInt(0).Mul(collateralAdjusted, constants.ADDITIONAL_PRICE_PRECISION)
 	healthFactor.Div(healthFactor, debtValueUSD)
 
-	return healthFactor
+	return healthFactor.Mul(healthFactor, constants.PRECISION)
 }
 
 func CalculateHealthFactorAfterMint(currentCollateralUSD, currentDebt, mintAmount *big.Int) *big.Int {

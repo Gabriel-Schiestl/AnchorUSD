@@ -3,6 +3,7 @@ import { useAccount, useBalance } from "wagmi";
 import { formatUnits } from "viem";
 
 export function useWalletBalance(tokenAddress?: `0x${string}`) {
+  console.log("useWalletBalance -> tokenAddress:", tokenAddress);
   const { address, isConnected } = useAccount();
   const [balance, setBalance] = useState<string>("0");
   const [isLoading, setIsLoading] = useState(false);
@@ -16,7 +17,7 @@ export function useWalletBalance(tokenAddress?: `0x${string}`) {
     if (balanceData) {
       const formattedBalance = formatUnits(
         balanceData.value,
-        balanceData.decimals
+        balanceData.decimals,
       );
       setBalance(formattedBalance);
     } else {

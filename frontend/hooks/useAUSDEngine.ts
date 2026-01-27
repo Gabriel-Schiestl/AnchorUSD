@@ -21,18 +21,21 @@ export function useAUSDEngine() {
       refreshInterval: 10000,
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
-    }
+    },
   );
 
   const calculateHealthFactorAfterMint = async (
-    mintAmount: string
+    mintAmount: string,
   ): Promise<HealthFactorProjection | null> => {
     if (!address) return null;
+
+    const mintAmountBigInt = BigInt(mintAmount);
+    const scaledMintAmount = mintAmountBigInt * BigInt(1e18);
 
     try {
       return await ausdEngineApi.calculateHealthFactorAfterMint(
         address,
-        mintAmount
+        scaledMintAmount.toString(),
       );
     } catch (err) {
       console.error("Error calculating health factor after mint:", err);
@@ -41,14 +44,14 @@ export function useAUSDEngine() {
   };
 
   const calculateHealthFactorAfterBurn = async (
-    burnAmount: string
+    burnAmount: string,
   ): Promise<HealthFactorProjection | null> => {
     if (!address) return null;
 
     try {
       return await ausdEngineApi.calculateHealthFactorAfterBurn(
         address,
-        burnAmount
+        burnAmount,
       );
     } catch (err) {
       console.error("Error calculating health factor after burn:", err);
@@ -58,15 +61,18 @@ export function useAUSDEngine() {
 
   const calculateHealthFactorAfterDeposit = async (
     tokenAddress: string,
-    depositAmount: string
+    depositAmount: string,
   ): Promise<HealthFactorProjection | null> => {
     if (!address) return null;
+
+    const depositAmountBigInt = BigInt(depositAmount);
+    const scaledDepositAmount = depositAmountBigInt * BigInt(1e18);
 
     try {
       return await ausdEngineApi.calculateHealthFactorAfterDeposit(
         address,
         tokenAddress,
-        depositAmount
+        scaledDepositAmount.toString(),
       );
     } catch (err) {
       console.error("Error calculating health factor after deposit:", err);

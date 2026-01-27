@@ -58,7 +58,7 @@ export function UserDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              ${formatFromWeiPrecise(data.collateral_value_usd, 18, 2)}
+              ${formatFromWeiPrecise(data.collateral_value_usd, 8, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
               Deposited collateral value
@@ -96,10 +96,16 @@ export function UserDashboard() {
                 parseFloat(formatFromWei(data.current_health_factor)),
               )}`}
             >
-              {parseFloat(formatFromWei(data.current_health_factor)).toFixed(2)}
+              {parseFloat(formatFromWei(data.current_health_factor)) >= 9
+                ? ">9.00"
+                : parseFloat(formatFromWei(data.current_health_factor)).toFixed(
+                    2,
+                  )}
             </div>
             <p className="text-xs text-muted-foreground">
-              {getHealthFactorStatus(parseFloat(formatFromWei(data.current_health_factor)))}
+              {getHealthFactorStatus(
+                parseFloat(formatFromWei(data.current_health_factor)),
+              )}
             </p>
           </CardContent>
         </Card>
@@ -119,7 +125,9 @@ export function UserDashboard() {
             <span className="text-sm text-muted-foreground">Healthy</span>
           </div>
           <Progress
-            value={getHealthPercent(parseFloat(formatFromWei(data.current_health_factor)))}
+            value={getHealthPercent(
+              parseFloat(formatFromWei(data.current_health_factor)),
+            )}
             className="h-3"
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -144,7 +152,7 @@ export function UserDashboard() {
           <div className="rounded-lg border border-border bg-secondary/30 p-4">
             <p className="text-sm text-muted-foreground">You can mint up to</p>
             <p className="mt-2 text-3xl font-bold text-primary">
-              ${formatFromWeiPrecise(data.max_mintable, 18, 2)}
+              ${parseFloat(formatFromWei(data.max_mintable)).toFixed(2)}
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
               AUSD based on your current collateral
@@ -190,7 +198,7 @@ export function UserDashboard() {
                   </div>
                   <div className="text-right">
                     <p className="font-mono font-medium text-foreground">
-                      ${formatFromWeiPrecise(balance.valueUsd, 18, 2)}
+                      ${formatFromWeiPrecise(balance.valueUsd, 8, 2)}
                     </p>
                   </div>
                 </div>

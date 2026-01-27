@@ -54,11 +54,6 @@ func main() {
 	cacheStore := storage.NewCacheStore(cacheConfig)
 	logger.Info().Msg("Cache store initialized")
 
-	logger.Info().Msg("Initializing metrics store and service")
-	metricsStore := storage.NewMetricsStore(db)
-	metricsService := service.NewMetricsService(metricsStore)
-	logger.Info().Msg("Metrics service ready")
-
 	logger.Info().Msg("Initializing price feed API")
 	priceFeed := external.NewPriceFeedAPI()
 	logger.Info().Msg("Price feed API initialized")
@@ -104,7 +99,7 @@ func main() {
 	logger.Info().Msg("Initial metrics updated")
 
 	logger.Info().Msg("Registering HTTP routes")
-	http.RegisterRoutes(metricsService, userDataService, healthFactorCalcService, dashboardMetricsService, historyService)
+	http.RegisterRoutes(userDataService, healthFactorCalcService, dashboardMetricsService, historyService)
 	logger.Info().Msg("HTTP routes registered")
 
 	logger.Info().Str("address", ":3000").Msg("Starting HTTP server")

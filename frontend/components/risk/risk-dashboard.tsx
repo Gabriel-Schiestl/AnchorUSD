@@ -18,6 +18,7 @@ import { ConnectWalletPrompt } from "@/components/connect-wallet-prompt";
 import { mockRiskData } from "@/api/mocks/user";
 import { get, LiquidatableUser, MetricsData } from "@/api/get";
 import { getHealthFactorColor } from "@/domain/healthFactor";
+import { formatFromWei, formatFromWeiPrecise } from "@/lib/utils";
 
 export function RiskDashboard() {
   const { isConnected } = useAccount();
@@ -58,7 +59,7 @@ export function RiskDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              ${data.totalCollateral.value}
+              ${formatFromWeiPrecise(data.totalCollateral.value, 8, 2)}
             </div>
             <p className="text-xs text-muted-foreground">
               Locked in the protocol
@@ -75,7 +76,7 @@ export function RiskDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-foreground">
-              ${data.stableSupply.total}
+              ${parseFloat(formatFromWei(data.stableSupply.total)).toFixed(2)}
             </div>
             <p className="text-xs text-muted-foreground">
               {data.stableSupply.backing}% collateralized
@@ -144,7 +145,7 @@ export function RiskDashboard() {
                   </div>
                   <div className="text-right">
                     <span className="font-mono text-foreground">
-                      ${item.valueUsd}
+                      ${formatFromWeiPrecise(item.valueUsd, 8, 2)}
                     </span>
                     <span className="ml-2 text-sm text-muted-foreground">
                       ({item.percentage}%)

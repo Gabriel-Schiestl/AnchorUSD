@@ -1,4 +1,6 @@
-// Endereços dos contratos - Ajuste conforme seu deployment
+export const AUSD_ENGINE_ADDRESS = (process.env.NEXT_PUBLIC_AUSD_ENGINE_ADDRESS ||
+  "0x0000000000000000000000000000000000000000") as `0x${string}`;
+
 export const TOKEN_ADDRESSES = {
   WETH: (process.env.NEXT_PUBLIC_WETH_ADDRESS ||
     "0x0000000000000000000000000000000000000000") as `0x${string}`,

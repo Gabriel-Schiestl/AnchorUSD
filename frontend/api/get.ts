@@ -42,6 +42,11 @@ export interface MetricsData {
 type PathsAccepted = "/history" | "/dashboard" | "/risk" | string;
 
 export const get = async <T>(path: PathsAccepted): Promise<T> => {
-  const response = await axiosInstance.get<T>(path);
-  return response.data;
+  try {
+    const response = await axiosInstance.get<T>(path);
+    return response.data;
+  } catch (error) {
+    console.error(`Error fetching data from ${path}:`, error);
+    throw error;
+  }
 };

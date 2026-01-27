@@ -10,6 +10,8 @@ func CalculateMaxMintable(collateralValueUSDStr, totalDebtStr string) string {
 	collateralValueUSD := new(big.Int)
 	collateralValueUSD.SetString(collateralValueUSDStr, 10)
 
+	collateralValueUSD.Mul(collateralValueUSD, constants.ADDITIONAL_PRICE_PRECISION)
+
 	totalDebt := new(big.Int)
 	totalDebt.SetString(totalDebtStr, 10)
 
