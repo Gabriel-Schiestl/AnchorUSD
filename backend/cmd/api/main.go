@@ -94,6 +94,10 @@ func main() {
 	worker.RunLiquidationsWorker(cacheStore, priceFeed)
 	logger.Info().Msg("Liquidations worker started")
 
+	logger.Info().Msg("Flushing cache store")
+	cacheStore.FlushAll()
+	logger.Info().Msg("Cache store flushed successfully")
+
 	logger.Info().Msg("Updating initial metrics")
 	service.UpdateMetrics(cacheStore, priceFeed)
 	logger.Info().Msg("Initial metrics updated")

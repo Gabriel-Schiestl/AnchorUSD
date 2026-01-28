@@ -53,34 +53,53 @@ func (s *collateralStore) GetLatestRedeems(ctx context.Context, userAddress stri
 	return redeems, err
 }
 
-func (s *collateralStore) GetTotalCollateralDepositedGroupingByUser(ctx context.Context) (map[string]map[string]*big.Int, error) {
-	var results []struct {
-		UserAddress    string
-		CollateralAddress string
-		TotalDeposited model.BigInt
-	}
+func (s *collateralStore) IterateTotalDepositedGroupingByUser(ctx context.Context, limit int, cb func(map[string]map[string]*big.Int) error) error {
+	if limit <= 0 {
+        limit = 500
+    }
 
-	err := s.DB.WithContext(ctx).
-		Model(&model.Deposit{}).
-		Select("user_address, collateral_address, SUM(amount) as total_deposited").
-		Group("user_address, collateral_address").
-		Scan(&results).Error
-	if err != nil {
-		return nil, err
-	}
+    var count int64
+    if err := s.DB.WithContext(ctx).Model(&model.Deposit{}).Distinct("user_address").Count(&count).Error; err != nil {
+        return err
+    }
+    pages := int((count + int64(limit) - 1) / int64(limit))
 
-	totalCollateralByUser := make(map[string]map[string]*big.Int)
-	for _, result := range results {
-		if _, exists := totalCollateralByUser[result.UserAddress]; !exists {
-			totalCollateralByUser[result.UserAddress] = make(map[string]*big.Int)
+	for page := range pages {
+		rows, err := s.DB.WithContext(ctx).
+            Raw("SELECT user_address, SUM(amount)::text, collateral_address FROM deposits GROUP BY user_address, collateral_address ORDER BY user_address LIMIT ? OFFSET ?", limit, page*limit).
+            Rows()
+        if err != nil {
+            return err
+        }
+
+		mappings := make(map[string]map[string]*big.Int)
+
+        for rows.Next() {
+            var user string
+            var totalStr string
+			var collateralAddr string
+            if err := rows.Scan(&user, &totalStr, &collateralAddr); err != nil {
+                rows.Close()
+                return err
+            }
+            bi := new(big.Int)
+            bi.SetString(totalStr, 10)
+			if _, exists := mappings[user]; !exists {
+				mappings[user] = make(map[string]*big.Int)
+			}
+			mappings[user][collateralAddr] = bi
+        }
+		if err := cb(mappings); err != nil {
+			rows.Close()
+			return err
 		}
-		totalCollateralByUser[result.UserAddress][result.CollateralAddress] = result.TotalDeposited.Int
+        rows.Close()
 	}
 
-	return totalCollateralByUser, nil
+	return nil
 }
 
-func (s *collateralStore) GetTotalCollateralRedeemedGroupingByUser(ctx context.Context) (map[string]map[string]*big.Int, error) {
+func (s *collateralStore) GetTotalCollateralRedeemedGroupingByUser(ctx context.Context, users []string) (map[string]map[string]*big.Int, error) {
 	var results []struct {
 		UserAddress      string
 		CollateralAddress string
@@ -91,6 +110,7 @@ func (s *collateralStore) GetTotalCollateralRedeemedGroupingByUser(ctx context.C
 		Model(&model.Redeem{}).
 		Select("user_address, collateral_address, SUM(amount) as total_redeemed").
 		Group("user_address, collateral_address").
+		Where("user_address IN ?", users).
 		Scan(&results).Error
 	if err != nil {
 		return nil, err

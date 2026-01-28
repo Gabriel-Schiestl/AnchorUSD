@@ -45,6 +45,7 @@ type ICacheStore interface {
 	HGetAll(key string) (map[string]string, error)
 	SSet(key string, members ...string) error
 	SGetAll(key string) ([]string, error)
+	FlushAll() error
 }
 
 func NewCacheStore(config CacheConfig) *CacheStore {
@@ -162,4 +163,8 @@ func (cs *CacheStore) SSet(key string, members ...string) error {
 
 func (cs *CacheStore) SGetAll(key string) ([]string, error) {
 	return cs.Client.SMembers(key).Result()
+}
+
+func (cs *CacheStore) FlushAll() error {
+	return cs.Client.FlushAll().Err()
 }

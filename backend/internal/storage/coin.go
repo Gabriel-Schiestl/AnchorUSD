@@ -37,8 +37,7 @@ func (cs *coinStore) GetLatestBurns(ctx context.Context, userAddress string, lim
 	return burns, err
 }
 
-// TODO: implement pagination for large datasets
-func (cs *coinStore) GetTotalBurnedGroupingByUser(ctx context.Context) (map[string]*big.Int, error) {
+func (cs *coinStore) GetTotalBurnedGroupingByUser(ctx context.Context, users []string) (map[string]*big.Int, error) {
 	var results []struct {
 		UserAddress string
 		TotalBurned model.BigInt
@@ -48,6 +47,7 @@ func (cs *coinStore) GetTotalBurnedGroupingByUser(ctx context.Context) (map[stri
 		Model(&model.Burns{}).
 		Select("user_address, SUM(amount) as total_burned").
 		Group("user_address").
+		Where("user_address IN ?", users).
 		Scan(&results).Error
 	if err != nil {
 		return nil, err
@@ -75,26 +75,44 @@ func (cs *coinStore) GetLatestMints(ctx context.Context, userAddress string, lim
 	return mints, err
 }
 
-// TODO: implement pagination for large datasets
-func (cs *coinStore) GetTotalMintedGroupingByUser(ctx context.Context) (map[string]*big.Int, error) {
-	var results []struct {
-		UserAddress string
-		TotalMinted model.BigInt
-	}
+func (cs *coinStore) IterateTotalMintedGroupingByUser(ctx context.Context, limit int, cb func(map[string]*big.Int) error) error {
+    if limit <= 0 {
+        limit = 500
+    }
 
-	err := cs.DB.WithContext(ctx).
-		Model(&model.Mints{}).
-		Select("user_address, SUM(amount) as total_minted").
-		Group("user_address").
-		Scan(&results).Error
-	if err != nil {
-		return nil, err
-	}
+    var count int64
+    if err := cs.DB.WithContext(ctx).Model(&model.Mints{}).Distinct("user_address").Count(&count).Error; err != nil {
+        return err
+    }
+    pages := int((count + int64(limit) - 1) / int64(limit))
 
-	totalMintedByUser := make(map[string]*big.Int)
-	for _, result := range results {
-		totalMintedByUser[result.UserAddress] = result.TotalMinted.Int
-	}
+    for page := range pages {
+        rows, err := cs.DB.WithContext(ctx).
+            Raw("SELECT user_address, SUM(amount)::text as total_minted FROM mints GROUP BY user_address ORDER BY user_address LIMIT ? OFFSET ?", limit, page*limit).
+            Rows()
+        if err != nil {
+            return err
+        }
 
-	return totalMintedByUser, nil
+		mappings := make(map[string]*big.Int)
+
+        for rows.Next() {
+            var user string
+            var totalStr string
+            if err := rows.Scan(&user, &totalStr); err != nil {
+                rows.Close()
+                return err
+            }
+            bi := new(big.Int)
+            bi.SetString(totalStr, 10)
+			mappings[user] = bi
+        }
+		if err := cb(mappings); err != nil {
+			rows.Close()
+			return err
+		}
+        rows.Close()
+    }
+
+    return nil
 }
