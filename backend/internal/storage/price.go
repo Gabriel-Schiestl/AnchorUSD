@@ -3,6 +3,7 @@ package storage
 import (
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type IPriceStore interface {
@@ -44,6 +45,6 @@ func (s *priceStore) SavePriceInBlock(tokenName string, blockNumber uint64, pric
 		BlockNumber: blockNumber,
 		PriceInUSD:  priceInUSD,
 	}
-	result := s.DB.Create(&price)
+	result := s.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&price)
 	return result.Error
 }

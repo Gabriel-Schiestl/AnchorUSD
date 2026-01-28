@@ -6,6 +6,19 @@ import {
   HealthFactorProjection,
 } from "@/api/ausd-engine";
 
+function toScaledIntegerString(amount: string, decimals = 18): string {
+  if (!amount) return "0";
+  const [wholePart, fracPart = ""] = amount.split(".");
+  const whole =
+    wholePart === "" ? "0" : wholePart.replace(/^0+(?=\d)|\D/g, "") || "0";
+  const frac = fracPart.replace(/\D/g, "");
+  const paddedFrac = (frac + "0".repeat(decimals)).slice(0, decimals);
+  const multiplier = BigInt("1" + "0".repeat(decimals));
+  const wholeBig = BigInt(whole);
+  const fracBig = BigInt(paddedFrac || "0");
+  return (wholeBig * multiplier + fracBig).toString();
+}
+
 export function useAUSDEngine() {
   const { address, isConnected } = useAccount();
 
@@ -29,8 +42,7 @@ export function useAUSDEngine() {
   ): Promise<HealthFactorProjection | null> => {
     if (!address) return null;
 
-    const mintAmountBigInt = BigInt(mintAmount);
-    const scaledMintAmount = mintAmountBigInt * BigInt(1e18);
+    const scaledMintAmount = toScaledIntegerString(mintAmount, 18);
 
     try {
       return await ausdEngineApi.calculateHealthFactorAfterMint(
@@ -51,7 +63,7 @@ export function useAUSDEngine() {
     try {
       return await ausdEngineApi.calculateHealthFactorAfterBurn(
         address,
-        burnAmount,
+        toScaledIntegerString(burnAmount, 18),
       );
     } catch (err) {
       console.error("Error calculating health factor after burn:", err);
@@ -65,8 +77,7 @@ export function useAUSDEngine() {
   ): Promise<HealthFactorProjection | null> => {
     if (!address) return null;
 
-    const depositAmountBigInt = BigInt(depositAmount);
-    const scaledDepositAmount = depositAmountBigInt * BigInt(1e18);
+    const scaledDepositAmount = toScaledIntegerString(depositAmount, 18);
 
     try {
       return await ausdEngineApi.calculateHealthFactorAfterDeposit(
