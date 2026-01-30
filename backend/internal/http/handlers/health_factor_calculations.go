@@ -12,6 +12,7 @@ type HealthFactorCalculator interface {
 	CalculateMint(ctx context.Context, req model.CalculateMintRequest) (model.HealthFactorProjection, error)
 	CalculateBurn(ctx context.Context, req model.CalculateBurnRequest) (model.HealthFactorProjection, error)
 	CalculateDeposit(ctx context.Context, req model.CalculateDepositRequest) (model.HealthFactorProjection, error)
+	CalculateRedeem(ctx context.Context, req model.CalculateRedeemRequest) (model.HealthFactorProjection, error)
 }
 
 func CalculateMintHandler(svc HealthFactorCalculator) gin.HandlerFunc {
@@ -85,6 +86,31 @@ func CalculateDepositHandler(svc HealthFactorCalculator) gin.HandlerFunc {
 		}
 
 		logger.Info().Str("user", req.Address).Str("token", req.TokenAddress).Str("new_health_factor", result.HealthFactorAfter).Msg("Deposit health factor calculated successfully")
+		ctx.JSON(200, result)
+	}
+}
+
+func CalculateRedeemHandler(svc HealthFactorCalculator) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		logger := utils.GetLogger()
+		var req model.CalculateRedeemRequest
+
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			logger.Warn().Err(err).Msg("Invalid request body for redeem calculation")
+			ctx.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+
+		logger.Info().Str("user", req.Address).Str("amount", req.RedeemAmount).Str("token", req.TokenAddress).Msg("Calculating redeem health factor")
+
+		result, err := svc.CalculateRedeem(ctx.Request.Context(), req)
+		if err != nil {
+			logger.Error().Err(err).Str("user", req.Address).Str("token", req.TokenAddress).Msg("Failed to calculate redeem health factor")
+			ctx.JSON(500, gin.H{"error": err.Error()})
+			return
+		}
+
+		logger.Info().Str("user", req.Address).Str("token", req.TokenAddress).Str("new_health_factor", result.HealthFactorAfter).Msg("Redeem health factor calculated successfully")
 		ctx.JSON(200, result)
 	}
 }

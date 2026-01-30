@@ -42,6 +42,8 @@ export function MintBurnDeposit() {
   const [activeTab, setActiveTab] = useState("deposit");
   const [selectedAsset, setSelectedAsset] = useState("WETH");
   const [amount, setAmount] = useState("");
+  const [alsoBurn, setAlsoBurn] = useState(false);
+  const [burnAmount, setBurnAmount] = useState("");
   const [healthFactorProjection, setHealthFactorProjection] = useState<
     string | null
   >(null);
@@ -66,6 +68,7 @@ export function MintBurnDeposit() {
     calculateHealthFactorAfterMint,
     calculateHealthFactorAfterBurn,
     calculateHealthFactorAfterDeposit,
+    calculateHealthFactorAfterRedeem,
   } = useAUSDEngine();
 
   const {
@@ -73,6 +76,7 @@ export function MintBurnDeposit() {
     mintAUSD,
     burnAUSD,
     redeemCollateral,
+    redeemCollateralForAUSD,
     isProcessing,
     isWritePending,
     isConfirming,
@@ -96,19 +100,21 @@ export function MintBurnDeposit() {
       ]);
 
       setAmount("");
+      setAlsoBurn(false);
+      setBurnAmount("");
       setHealthFactorProjection(null);
     }
   }, [isConfirmed, transactionHash]);
 
-  useEffect(() => {
-    if (needsApproval) {
-      toast.info("Approval required", {
-        description:
-          "Click the button again after the approval is confirmed to continue",
-        duration: 5000,
-      });
-    }
-  }, [needsApproval]);
+  // useEffect(() => {
+  //   if (needsApproval) {
+  //     toast.info("Approval required", {
+  //       description:
+  //         "Click the button again after the approval is confirmed to continue",
+  //       duration: 5000,
+  //     });
+  //   }
+  // }, [needsApproval]);
 
   useEffect(() => {
     if (txError) {
@@ -139,6 +145,42 @@ export function MintBurnDeposit() {
             selectedTokenAddress,
             amount,
           );
+        } else if (activeTab === "redeem" && selectedTokenAddress) {
+          if (alsoBurn && burnAmount && !isNaN(parseFloat(burnAmount))) {
+            const [burnProj, redeemProj] = await Promise.all([
+              calculateHealthFactorAfterBurn(burnAmount),
+              calculateHealthFactorAfterRedeem(selectedTokenAddress, amount),
+            ]);
+
+            if (burnProj && redeemProj) {
+              const newDebtStr = burnProj.newDebt || "0";
+              const newCollateralValueStr =
+                redeemProj.newCollateralValue || "0";
+
+              const newDebt = parseFloat(formatFromWei(newDebtStr || "0"));
+              const newCollateralValue = parseFloat(
+                formatFromWei(newCollateralValueStr || "0"),
+              );
+
+              const collateralAdjusted = (newCollateralValue * 50) / 100;
+
+              let combinedHF = 0;
+              if (newDebt === 0) combinedHF = Number.MAX_SAFE_INTEGER;
+              else combinedHF = collateralAdjusted / newDebt;
+
+              const scaledHF = Math.floor(combinedHF * 1e18).toString();
+              projection = {
+                healthFactorAfter: scaledHF,
+                newDebt: newDebtStr,
+                newCollateral: newCollateralValueStr,
+              } as any;
+            }
+          } else {
+            projection = await calculateHealthFactorAfterRedeem(
+              selectedTokenAddress,
+              amount,
+            );
+          }
         }
 
         if (projection) {
@@ -152,7 +194,7 @@ export function MintBurnDeposit() {
 
     const debounce = setTimeout(updateHealthFactorProjection, 500);
     return () => clearTimeout(debounce);
-  }, [amount, activeTab, selectedTokenAddress]);
+  }, [amount, activeTab, selectedTokenAddress, alsoBurn, burnAmount]);
 
   const handleSubmit = async (action: string) => {
     if (!amount || parseFloat(amount) <= 0) {
@@ -163,10 +205,6 @@ export function MintBurnDeposit() {
     }
 
     try {
-      toast.info("Preparing transaction...", {
-        description: currentOperation || "Please wait...",
-      });
-
       switch (action) {
         case "deposit":
           if (!selectedTokenAddress) {
@@ -189,7 +227,26 @@ export function MintBurnDeposit() {
             toast.error("Select an asset");
             return;
           }
-          await redeemCollateral(selectedTokenAddress, amount);
+          if (alsoBurn) {
+            if (!burnAmount || parseFloat(burnAmount) <= 0) {
+              toast.error("Invalid burn amount", {
+                description: "Enter AUSD to burn",
+              });
+              return;
+            }
+            if (parseFloat(burnAmount) > parseFloat(ausdBalance)) {
+              toast.error("Insufficient AUSD balance");
+              return;
+            }
+
+            await redeemCollateralForAUSD(
+              selectedTokenAddress,
+              amount,
+              burnAmount,
+            );
+          } else {
+            await redeemCollateral(selectedTokenAddress, amount);
+          }
           break;
 
         default:
@@ -228,7 +285,7 @@ export function MintBurnDeposit() {
 
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid w-full grid-cols-3 bg-secondary">
+      <TabsList className="grid w-full grid-cols-4 bg-secondary">
         <TabsTrigger
           value="deposit"
           className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
@@ -249,6 +306,13 @@ export function MintBurnDeposit() {
         >
           <Flame className="h-4 w-4" />
           Burn
+        </TabsTrigger>
+        <TabsTrigger
+          value="redeem"
+          className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground hover:cursor-pointer"
+        >
+          <ArrowDownUp className="h-4 w-4" />
+          Redeem
         </TabsTrigger>
       </TabsList>
 
@@ -513,6 +577,176 @@ export function MintBurnDeposit() {
                 <>
                   <Coins className="mr-2 h-4 w-4" />
                   Mint AUSD
+                </>
+              )}
+            </Button>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="redeem">
+        <Card className="border-border bg-card">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-foreground">
+                  <ArrowDownUp className="h-5 w-5 text-primary" />
+                  Redeem Collateral
+                </CardTitle>
+                <CardDescription>
+                  Redeem your deposited collateral back to your wallet
+                </CardDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleRefresh}
+                disabled={isLoadingBalance || isLoadingEngine}
+              >
+                <RefreshCw
+                  className={`h-4 w-4 ${isLoadingBalance || isLoadingEngine ? "animate-spin" : ""}`}
+                />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="redeem-asset">Collateral Asset</Label>
+              <Select value={selectedAsset} onValueChange={setSelectedAsset}>
+                <SelectTrigger
+                  id="redeem-asset"
+                  className="bg-secondary hover:cursor-pointer"
+                >
+                  <SelectValue placeholder="Select an asset" />
+                </SelectTrigger>
+                <SelectContent>
+                  {collateralAssets.map((asset) => (
+                    <SelectItem key={asset.symbol} value={asset.symbol}>
+                      <div className="flex items-center gap-2 hover:cursor-pointer">
+                        <span className="font-mono">{asset.icon}</span>
+                        <span>{asset.symbol}</span>
+                        <span className="text-muted-foreground">
+                          - {asset.name}
+                        </span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="redeem-amount">Amount</Label>
+              <div className="relative">
+                <Input
+                  id="redeem-amount"
+                  type="number"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  className="bg-secondary pr-16"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  {selectedAsset}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-muted-foreground">
+                  Available balance:
+                </span>
+                <span className="font-mono">
+                  {isLoadingBalance ? (
+                    <Loader2 className="h-3 w-3 animate-spin inline" />
+                  ) : (
+                    (() => {
+                      const coll = engineData?.collateral_deposited?.find(
+                        (c) => c.asset === selectedTokenAddress,
+                      );
+                      if (coll) {
+                        return `${parseFloat(
+                          formatFromWei(coll.amount),
+                        ).toFixed(4)} ${selectedAsset}`;
+                      }
+                      return `0.0000 ${selectedAsset}`;
+                    })()
+                  )}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                id="also-burn"
+                type="checkbox"
+                checked={alsoBurn}
+                onChange={(e) => setAlsoBurn(e.target.checked)}
+                className="h-4 w-4"
+              />
+              <label
+                htmlFor="also-burn"
+                className="text-sm text-muted-foreground"
+              >
+                Burn AUSD
+              </label>
+            </div>
+
+            {alsoBurn && (
+              <div className="space-y-2">
+                <Label htmlFor="redeem-burn-amount">AUSD to burn</Label>
+                <div className="relative">
+                  <Input
+                    id="redeem-burn-amount"
+                    type="number"
+                    placeholder="0.00"
+                    value={burnAmount}
+                    onChange={(e) => setBurnAmount(e.target.value)}
+                    className="bg-secondary pr-16"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                    AUSD
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {healthFactorProjection && (
+              <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <ArrowDownUp className="h-4 w-4 text-primary" />
+                  <span className="text-muted-foreground">
+                    Health Factor after redeem:
+                  </span>
+                  <span className="font-mono font-semibold text-primary">
+                    {parseFloat(formatFromWei(healthFactorProjection)).toFixed(
+                      2,
+                    )}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            <Button
+              className="w-full hover:cursor-pointer"
+              size="lg"
+              onClick={() => handleSubmit("redeem")}
+              disabled={
+                !amount ||
+                isProcessing ||
+                isWritePending ||
+                isConfirming ||
+                parseFloat(amount) > parseFloat(assetBalance)
+              }
+            >
+              {isProcessing || isWritePending || isConfirming ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {currentOperation ||
+                    (isConfirming ? "Confirmando..." : "Processando...")}
+                </>
+              ) : (
+                <>
+                  <ArrowDownUp className="mr-2 h-4 w-4" />
+                  Redeem {selectedAsset}
                 </>
               )}
             </Button>

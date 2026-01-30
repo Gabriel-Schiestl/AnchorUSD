@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   useAccount,
   useWriteContract,
@@ -27,6 +27,10 @@ export function useAUSDEngineOperations() {
   const [pendingApprovalHash, setPendingApprovalHash] = useState<
     `0x${string}` | undefined
   >();
+
+  const pendingPostApprovalRef = useRef<(() => Promise<void>) | undefined>(
+    undefined,
+  );
 
   const {
     writeContract,
@@ -84,11 +88,14 @@ export function useAUSDEngineOperations() {
     tokenAddress: Address,
     amount: string,
     decimals: number = 18,
+    onConfirmed?: () => Promise<void>,
   ): Promise<void> => {
     setOperationStep("approving");
     setCurrentOperation("Approving token...");
 
     const amountWei = parseUnits(amount, decimals);
+
+    pendingPostApprovalRef.current = onConfirmed;
 
     writeContract(
       {
@@ -105,6 +112,7 @@ export function useAUSDEngineOperations() {
         },
         onError: (error) => {
           console.error("Error in approval:", error);
+          pendingPostApprovalRef.current = undefined;
           setOperationStep("idle");
           setCurrentOperation("");
           throw error;
@@ -126,7 +134,11 @@ export function useAUSDEngineOperations() {
       const hasAllowance = await checkAllowance(tokenAddress, amount, decimals);
       console.log("depositCollateral -> hasAllowance:", hasAllowance);
       if (!hasAllowance) {
-        await approveToken(tokenAddress, amount, decimals);
+        await approveToken(tokenAddress, amount, decimals, async () => {
+          setCurrentOperation("Approval confirmed! Continuing the deposit...");
+          setOperationStep("idle");
+          await depositCollateral(tokenAddress, amount, decimals);
+        });
         return;
       }
 
@@ -170,9 +182,22 @@ export function useAUSDEngineOperations() {
 
   useEffect(() => {
     if (isApprovalConfirmed && operationStep === "approved") {
-      setCurrentOperation("Approval confirmed! Continue the deposit.");
-      setOperationStep("idle");
+      const pending = pendingPostApprovalRef.current;
+      pendingPostApprovalRef.current = undefined;
       setPendingApprovalHash(undefined);
+
+      if (pending) {
+        setCurrentOperation("Approval confirmed! Continuing operation...");
+        setOperationStep("executing");
+        pending().catch((err) => {
+          console.error("Post-approval action failed:", err);
+          setOperationStep("idle");
+          setCurrentOperation("");
+        });
+      } else {
+        setCurrentOperation("Approval confirmed! Continue the deposit.");
+        setOperationStep("idle");
+      }
     }
   }, [isApprovalConfirmed, operationStep]);
 
@@ -257,6 +282,126 @@ export function useAUSDEngineOperations() {
     }
   };
 
+  const redeemCollateralForAUSD = async (
+    tokenAddress: Address,
+    collateralAmount: string,
+    aUSDToBurn: string,
+    decimals: number = 18,
+  ) => {
+    if (!address) throw new Error("Wallet not connected");
+
+    try {
+      if (parseFloat(aUSDToBurn) > 0) {
+        const hasAllowance = await checkAllowance(
+          TOKEN_ADDRESSES.AUSD,
+          aUSDToBurn,
+          18,
+        );
+
+        if (!hasAllowance) {
+          await approveToken(TOKEN_ADDRESSES.AUSD, aUSDToBurn, 18, async () => {
+            setCurrentOperation(
+              "Approval confirmed! Continuing the operation...",
+            );
+            setOperationStep("idle");
+            await redeemCollateralForAUSD(
+              tokenAddress,
+              collateralAmount,
+              aUSDToBurn,
+              decimals,
+            );
+          });
+          return;
+        }
+      }
+
+      setOperationStep("executing");
+      setCurrentOperation("Redeeming collateral and burning AUSD...");
+      const collateralAmountWei = parseUnits(collateralAmount, decimals);
+      const burnAmountWei = parseUnits(aUSDToBurn || "0", 18);
+
+      try {
+        const simulation = await publicClient!.simulateContract({
+          address: AUSD_ENGINE_ADDRESS,
+          abi: AUSDEngineABI,
+          functionName: "redeemCollateralForAUSD",
+          args: [tokenAddress, collateralAmountWei, burnAmountWei],
+          account: address,
+        });
+
+        console.log("Simulation of redeemCollateralForAUSD ok:", simulation);
+
+        writeContract({
+          address: AUSD_ENGINE_ADDRESS,
+          abi: AUSDEngineABI,
+          functionName: "redeemCollateralForAUSD",
+          args: [tokenAddress, collateralAmountWei, burnAmountWei],
+        });
+      } catch (simErr: any) {
+        console.error("Simulation reverted:", simErr);
+        const reason =
+          simErr?.cause?.error?.message ||
+          simErr?.shortMessage ||
+          simErr?.message;
+        throw new Error(
+          `Simulation failed before sending: ${reason || String(simErr)}`,
+        );
+      }
+    } catch (error) {
+      setOperationStep("idle");
+      setCurrentOperation("");
+      throw error;
+    }
+  };
+
+  const liquidate = async (
+    userToLiquidate: Address,
+    tokenAddress: Address,
+    debtToCover: string,
+    decimals: number = 18,
+  ) => {
+    if (!address) throw new Error("Wallet not connected");
+
+    try {
+      setOperationStep("executing");
+      setCurrentOperation("Liquidating user...");
+
+      const debtWei = parseUnits(debtToCover, 18);
+
+      try {
+        const simulation = await publicClient!.simulateContract({
+          address: AUSD_ENGINE_ADDRESS,
+          abi: AUSDEngineABI,
+          functionName: "liquidate",
+          args: [userToLiquidate, tokenAddress, debtWei],
+          account: address,
+        });
+
+        console.log("Simulation of liquidate ok:", simulation);
+
+        writeContract({
+          address: AUSD_ENGINE_ADDRESS,
+          abi: AUSDEngineABI,
+          functionName: "liquidate",
+          args: [userToLiquidate, tokenAddress, debtWei],
+        });
+      } catch (simErr: any) {
+        console.error("Simulation reverted:", simErr);
+        const reason =
+          simErr?.cause?.error?.message ||
+          simErr?.shortMessage ||
+          simErr?.message;
+        throw new Error(
+          `Simulation failed before sending: ${reason || String(simErr)}`,
+        );
+      }
+    } catch (error) {
+      setOperationStep("idle");
+      setCurrentOperation("");
+      throw error;
+    }
+  };
+
   const isProcessing =
     operationStep !== "idle" && operationStep !== "confirmed";
 
@@ -265,6 +410,8 @@ export function useAUSDEngineOperations() {
     mintAUSD,
     burnAUSD,
     redeemCollateral,
+    redeemCollateralForAUSD,
+    liquidate,
     isProcessing,
     isWritePending,
     isConfirming,

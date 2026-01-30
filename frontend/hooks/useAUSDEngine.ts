@@ -91,6 +91,26 @@ export function useAUSDEngine() {
     }
   };
 
+  const calculateHealthFactorAfterRedeem = async (
+    tokenAddress: string,
+    redeemAmount: string,
+  ): Promise<HealthFactorProjection | null> => {
+    if (!address) return null;
+
+    const scaledRedeemAmount = toScaledIntegerString(redeemAmount, 18);
+
+    try {
+      return await ausdEngineApi.calculateHealthFactorAfterRedeem(
+        address,
+        tokenAddress,
+        scaledRedeemAmount.toString(),
+      );
+    } catch (err) {
+      console.error("Error calculating health factor after redeem:", err);
+      return null;
+    }
+  };
+
   return {
     engineData: engineData || null,
     isLoading,
@@ -99,5 +119,6 @@ export function useAUSDEngine() {
     calculateHealthFactorAfterMint,
     calculateHealthFactorAfterBurn,
     calculateHealthFactorAfterDeposit,
+    calculateHealthFactorAfterRedeem,
   };
 }

@@ -166,6 +166,62 @@ func (s *healthFactorCalculationService) CalculateDeposit(ctx context.Context, r
 	}, nil
 }
 
+func (s *healthFactorCalculationService) CalculateRedeem(ctx context.Context, req model.CalculateRedeemRequest) (model.HealthFactorProjection, error) {
+	logger := utils.GetLogger()
+	logger.Info().Str("user", req.Address).Str("token", req.TokenAddress).Str("amount", req.RedeemAmount).Msg("Calculating health factor projection for redeem operation")
+
+	collateralUSDStr, err := s.Store.HGet("user:collateral_usd", req.Address)
+	if err != nil {
+		logger.Debug().Err(err).Str("user", req.Address).Msg("Collateral USD not found, defaulting to 0")
+		collateralUSDStr = "0"
+	}
+
+	debtStr, err := s.Store.HGet("user:debt", req.Address)
+	if err != nil {
+		logger.Debug().Err(err).Str("user", req.Address).Msg("User debt not found, defaulting to 0")
+		debtStr = "0"
+	}
+
+	currentCollateralUSD := new(big.Int)
+	currentCollateralUSD.SetString(collateralUSDStr, 10)
+
+	currentDebt := new(big.Int)
+	currentDebt.SetString(debtStr, 10)
+
+	redeemAmount := new(big.Int)
+	redeemAmount.SetString(req.RedeemAmount, 10)
+
+	tokenName := getTokenNameByAddress(req.TokenAddress)
+	logger.Debug().Str("token_address", req.TokenAddress).Str("token_name", tokenName).Msg("Token identified")
+
+	priceStr, err := getTokenPrice(s.PriceFeed, tokenName)
+	if err != nil {
+		logger.Error().Err(err).Str("token_name", tokenName).Msg("Failed to get token price")
+		return model.HealthFactorProjection{}, err
+	}
+	logger.Debug().Str("token_name", tokenName).Str("price_usd", priceStr).Msg("Token price fetched")
+
+	redeemAmountUSD, err := domain.GetTokenAmountInUSD(redeemAmount, priceStr)
+	if err != nil {
+		logger.Error().Err(err).Str("redeem_amount", req.RedeemAmount).Str("price", priceStr).Msg("Failed to convert redeem amount to USD")
+		return model.HealthFactorProjection{}, err
+	}
+
+	newCollateralUSD := new(big.Int).Sub(currentCollateralUSD, redeemAmountUSD)
+
+	logger.Debug().Str("user", req.Address).Str("current_collateral_usd", collateralUSDStr).Str("redeem_usd", redeemAmountUSD.String()).Str("new_collateral_usd", newCollateralUSD.String()).Msg("Calculating health factor after redeem")
+
+	healthFactorAfter := domain.CalculateHealthFactorAfterDeposit(currentCollateralUSD, currentDebt, redeemAmountUSD)
+
+	logger.Info().Str("user", req.Address).Str("token", tokenName).Str("health_factor_after", healthFactorAfter.String()).Str("new_collateral_value", newCollateralUSD.String()).Msg("Deposit health factor projection calculated successfully")
+
+	return model.HealthFactorProjection{
+		HealthFactorAfter:  healthFactorAfter.String(),
+		NewDebt:            currentDebt.String(),
+		NewCollateralValue: newCollateralUSD.String(),
+	}, nil
+}
+
 func getTokenNameByAddress(tokenAddress string) string {
 	logger := utils.GetLogger()
 	for name, address := range constants.CollateralTokens {

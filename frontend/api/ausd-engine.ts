@@ -37,6 +37,12 @@ interface CalculateDepositRequest {
   depositAmount: string;
 }
 
+interface CalculateRedeemRequest {
+  address: string;
+  tokenAddress: string;
+  redeemAmount: string;
+}
+
 export const ausdEngineApi = {
   getUserData: async (address: string): Promise<AUSDEngineData> => {
     return get<AUSDEngineData>(`/api/user/${address}`);
@@ -70,6 +76,17 @@ export const ausdEngineApi = {
     return post<HealthFactorProjection, CalculateDepositRequest>(
       `/api/ausd-engine/calculate-deposit`,
       { address, tokenAddress, depositAmount },
+    );
+  },
+
+  calculateHealthFactorAfterRedeem: async (
+    address: string,
+    tokenAddress: string,
+    redeemAmount: string,
+  ): Promise<HealthFactorProjection> => {
+    return post<HealthFactorProjection, CalculateRedeemRequest>(
+      `/api/ausd-engine/calculate-redeem`,
+      { address, tokenAddress, redeemAmount },
     );
   },
 };

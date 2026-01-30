@@ -34,6 +34,7 @@ func RegisterRoutes(
 		ausdEngine.POST("/calculate-mint", handlers.CalculateMintHandler(hfCalcSvc))
 		ausdEngine.POST("/calculate-burn", handlers.CalculateBurnHandler(hfCalcSvc))
 		ausdEngine.POST("/calculate-deposit", handlers.CalculateDepositHandler(hfCalcSvc))
+		ausdEngine.POST("/calculate-redeem", handlers.CalculateRedeemHandler(hfCalcSvc))
 	}
 	logger.Debug().Msg("Registered /api/ausd-engine routes")
 

@@ -16,6 +16,12 @@ type CalculateDepositRequest struct {
 	DepositAmount string `json:"depositAmount" binding:"required"`
 }
 
+type CalculateRedeemRequest struct {
+	Address       string `json:"address" binding:"required"`
+	TokenAddress  string `json:"tokenAddress" binding:"required"`
+	RedeemAmount string `json:"redeemAmount" binding:"required"`
+}
+
 type HealthFactorProjection struct {
 	HealthFactorAfter  string `json:"healthFactorAfter"`
 	NewDebt            string `json:"newDebt"`
