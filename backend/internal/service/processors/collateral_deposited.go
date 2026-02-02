@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/metrics"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model/constants"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
 	"github.com/ethereum/go-ethereum/common"
@@ -20,6 +22,7 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 	event := decodeCollateralDepositedEvent(log)
 	if event == nil {
 		logger.Error().Str("event", eventName).Uint64("block", log.BlockNumber).Msg("Failed to decode collateral deposited event")
+		metrics.RecordError("deposit", "decode_error")
 		return
 	}
 
@@ -35,6 +38,7 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 	err := storage.GetEventsStore().Create(context.Background(), eventModel)
 	if err != nil {
 		logger.Error().Err(err).Str("event", eventName).Msg("Failed to create event in database")
+		metrics.RecordError("deposit", "database_error")
 		return
 	}
 	logger.Debug().Uint("event_id", eventModel.ID).Msg("Event record created in database")
@@ -50,9 +54,15 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 	err = storage.GetCollateralStore().CreateDeposit(context.Background(), deposit)
 	if err != nil {
 		logger.Error().Err(err).Str("user", event.From.Hex()).Msg("Failed to create deposit record")
+		metrics.RecordError("deposit", "database_error")
 		return
 	}
 	logger.Debug().Str("deposit_id", deposit.ID).Msg("Deposit record created")
+
+	tokenName := getTokenNameByAddress(event.TokenAddr.Hex())
+	if tokenName != "" {
+		metrics.CollateralDepositsTotal.WithLabelValues(tokenName).Inc()
+	}
 
 	metric := model.Metrics{
 		UserAddress: event.From,
@@ -65,6 +75,15 @@ func ProcessCollateralDeposited(eventName string, log types.Log, metricsChan cha
 
 	metricsChan <- metric
 	logger.Info().Str("user", event.From.Hex()).Str("token", event.TokenAddr.Hex()).Str("amount", event.Amount.String()).Msg("Collateral deposited event processed and metric sent to channel")
+}
+
+func getTokenNameByAddress(address string) string {
+	for name, addr := range constants.CollateralTokens {
+		if addr == address {
+			return name
+		}
+	}
+	return ""
 }
 
 func decodeCollateralDepositedEvent(log types.Log) *model.CollateralDepositedEvent {

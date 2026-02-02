@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/domain"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/http/external"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/metrics"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model/constants"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
@@ -21,6 +23,11 @@ var ethAddr string
 var btcAddr string
 
 func UpdateMetrics(IcacheStore storage.ICacheStore, priceFeed external.IPriceFeedAPI) {
+	start := time.Now()
+	defer func() {
+		metrics.RecordOperation("update_metrics", time.Since(start).Seconds())
+	}()
+
 	cacheStore = IcacheStore
 	logger.Info().Msg("Starting metrics update process")
 
@@ -47,19 +54,23 @@ func getUsdPriceAndAddress(priceFeed external.IPriceFeedAPI) {
 			priceStr, err := priceFeed.GetEthUsdPrice()
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to fetch ETH price")
+				metrics.PriceFeedErrors.WithLabelValues("ETH").Inc()
 				continue
 			}
 			ethPrice = priceStr
 			ethAddr = address
+			metrics.TokenPriceUSD.WithLabelValues("ETH").Set(parseFloat64(priceStr))
 			logger.Debug().Str("price", priceStr).Str("address", address).Msg("ETH price and address loaded")
 		case "BTC":
 			priceStr, err := priceFeed.GetBtcUsdPrice()
 			if err != nil {
 				logger.Error().Err(err).Msg("Failed to fetch BTC price")
+				metrics.PriceFeedErrors.WithLabelValues("BTC").Inc()
 				continue
 			}
 			btcPrice = priceStr
 			btcAddr = address
+			metrics.TokenPriceUSD.WithLabelValues("BTC").Set(parseFloat64(priceStr))
 			logger.Debug().Str("price", priceStr).Str("address", address).Msg("BTC price and address loaded")
 		}
 	}
@@ -108,6 +119,9 @@ func iteratorTotalMintedByUserCallback(totalMintedByUser map[string]*big.Int) er
 
 	cacheStore.HSet("coin", "total_supply", totalSupply.String())
 	logger.Info().Str("total_supply", totalSupply.String()).Msg("Total coin supply updated in cache")
+	
+	metrics.AUSDTotalSupply.Set(parseFloat64(totalSupply.String()))
+	
 	return nil
 }
 
@@ -186,11 +200,44 @@ func iteratorTotalDepositedByUserCallback(totalDepositedByUser map[string]map[st
 			cacheStore.HAdd("user:collateral_usd", user, collateralUsd)
 
 			logger.Debug().Str("user", user).Str("collateral_usd", collateralUsd.String()).Msg("User collateral USD value updated in cache")
+			
+			tokenName := getTokenNameByAddress(collateralType)
+			if tokenName != "" {
+				metrics.TotalCollateralUSD.WithLabelValues(tokenName).Set(parseFloat64(collateralUsd.String()))
+			}
 		}
 	}
 
 	cacheStore.HSet("collateral", "total_supply", totalCollateral.String())
+	
+	metrics.CollateralizationRatio.Set(calculateCollateralizationRatio(totalCollateral, totalSupply))
+	
 	return nil
+}
+
+func parseFloat64(value string) float64 {
+	bigIntValue := new(big.Int)
+	bigIntValue.SetString(value, 10)
+	
+	bigFloatValue := new(big.Float).SetInt(bigIntValue)
+	result, _ := bigFloatValue.Float64()
+	
+	return result / 1e18
+}
+
+func calculateCollateralizationRatio(totalCollateral, totalSupply *big.Int) float64 {
+	if totalSupply.Sign() == 0 {
+		return 0
+	}
+	
+	collateralFloat := parseFloat64(totalCollateral.String())
+	supplyFloat := parseFloat64(totalSupply.String())
+	
+	if supplyFloat == 0 {
+		return 0
+	}
+	
+	return (collateralFloat / supplyFloat) * 100
 }
 
 func getCollateralUSD(collateralType string, deposited *big.Int, ethPrice, btcPrice string, ethAddr, btcAddr string) *big.Int {

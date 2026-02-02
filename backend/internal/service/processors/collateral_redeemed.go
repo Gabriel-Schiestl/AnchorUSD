@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/metrics"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
@@ -19,6 +20,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 	event := decodeEventData(log)
 	if event == nil {
 		logger.Error().Str("event", eventName).Uint64("block", log.BlockNumber).Msg("Failed to decode collateral redeemed event")
+		metrics.RecordError("redeem", "decode_error")
 		return
 	}
 
@@ -34,6 +36,7 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 	err := storage.GetEventsStore().Create(context.Background(), eventModel)
 	if err != nil {
 		logger.Error().Err(err).Str("event", eventName).Msg("Failed to create event in database")
+		metrics.RecordError("redeem", "database_error")
 		return
 	}
 	logger.Debug().Uint("event_id", eventModel.ID).Msg("Event record created in database")
@@ -49,9 +52,15 @@ func ProcessCollateralRedeemed(eventName string, log types.Log, metricsChan chan
 	err = storage.GetCollateralStore().CreateRedeem(context.Background(), collateral)
 	if err != nil {
 		logger.Error().Err(err).Str("user", event.User.Hex()).Msg("Failed to create redeem record")
+		metrics.RecordError("redeem", "database_error")
 		return
 	}
 	logger.Debug().Str("redeem_id", collateral.ID).Msg("Redeem record created")
+
+	tokenName := getTokenNameByAddress(event.Token.Hex())
+	if tokenName != "" {
+		metrics.CollateralRedeemsTotal.WithLabelValues(tokenName).Inc()
+	}
 
 	metric := model.Metrics{
 		UserAddress: event.User,

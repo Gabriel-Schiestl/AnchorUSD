@@ -3,9 +3,11 @@ package service
 import (
 	"context"
 	"math/big"
+	"time"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/domain"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/http/external"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/metrics"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model/constants"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
@@ -27,6 +29,11 @@ func NewDashboardMetricsService(store storage.ICacheStore, priceFeed external.IP
 }
 
 func (s *dashboardMetricsService) GetDashboardMetrics(ctx context.Context) (model.DashboardMetrics, error) {
+	start := time.Now()
+	defer func() {
+		metrics.RecordOperation("get_dashboard_metrics", time.Since(start).Seconds())
+	}()
+
 	logger := utils.GetLogger()
 	logger.Info().Msg("Starting dashboard metrics aggregation")
 
@@ -36,6 +43,8 @@ func (s *dashboardMetricsService) GetDashboardMetrics(ctx context.Context) (mode
 		liquidatableUsers = []model.LiquidatableUser{}
 	}
 	logger.Debug().Int("count", len(liquidatableUsers)).Msg("Liquidatable users retrieved")
+	
+	metrics.LiquidatableUsers.Set(float64(len(liquidatableUsers)))
 
 	totalCollateral, err := s.getTotalCollateral()
 	if err != nil {
@@ -50,6 +59,8 @@ func (s *dashboardMetricsService) GetDashboardMetrics(ctx context.Context) (mode
 		stableSupply = model.StableSupply{Total: "0", Circulating: "0", Backing: 0}
 	}
 	logger.Debug().Str("total", stableSupply.Total).Str("circulating", stableSupply.Circulating).Float64("backing", stableSupply.Backing).Msg("Stable supply retrieved")
+	
+	metrics.BackingPercentage.Set(stableSupply.Backing)
 
 	protocolHealth, err := s.getProtocolHealth()
 	if err != nil {
@@ -62,6 +73,10 @@ func (s *dashboardMetricsService) GetDashboardMetrics(ctx context.Context) (mode
 		}
 	}
 	logger.Debug().Float64("avg_health_factor", protocolHealth.AverageHealthFactor).Int("users_at_risk", protocolHealth.UsersAtRisk).Int("total_users", protocolHealth.TotalUsers).Msg("Protocol health retrieved")
+	
+	metrics.AverageHealthFactor.Set(protocolHealth.AverageHealthFactor)
+	metrics.UsersAtRisk.Set(float64(protocolHealth.UsersAtRisk))
+	metrics.ActiveUsersTotal.Set(float64(protocolHealth.TotalUsers))
 
 	logger.Info().Msg("Dashboard metrics aggregation completed successfully")
 

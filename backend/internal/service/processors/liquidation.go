@@ -2,8 +2,10 @@ package processors
 
 import (
 	"context"
+	"math/big"
 
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/blockchain"
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/metrics"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
@@ -19,6 +21,7 @@ func ProcessLiquidation(eventName string, log types.Log, metricsChan chan<- mode
 	event := decodeLiquidationEvent(log)
 	if event == nil {
 		logger.Error().Msg("Failed to decode liquidation event")
+		metrics.RecordError("liquidation", "decode_error")
 		return
 	}
 
@@ -40,6 +43,7 @@ func ProcessLiquidation(eventName string, log types.Log, metricsChan chan<- mode
 	err := storage.GetEventsStore().Create(context.Background(), eventModel)
 	if err != nil {
 		logger.Error().Err(err).Msg("Failed to create event in database")
+		metrics.RecordError("liquidation", "database_error")
 		return
 	}
 
@@ -56,8 +60,14 @@ func ProcessLiquidation(eventName string, log types.Log, metricsChan chan<- mode
 	err = storage.GetLiquidationStore().CreateLiquidation(context.Background(), liquidation)
 	if err != nil {
 		logger.Error().Err(err).Str("liquidation_id", liquidation.ID).Msg("Failed to create liquidation in database")
+		metrics.RecordError("liquidation", "database_error")
 		return
 	}
+
+	metrics.LiquidationsTotal.Inc()
+	debtFloat := new(big.Float).SetInt(event.DebtCovered)
+	debtFloat64, _ := debtFloat.Float64()
+	metrics.LiquidatedDebtTotal.Add(debtFloat64 / 1e18)
 
 	logger.Info().
 		Str("liquidated_user", event.LiquidatedUser.Hex()).

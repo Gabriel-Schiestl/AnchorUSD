@@ -4,6 +4,7 @@ import (
 	"context"
 	"math/big"
 
+	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/metrics"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/model"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/storage"
 	"github.com/Gabriel-Schiestl/AnchorUSD/backend/internal/utils"
@@ -19,6 +20,7 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 	event := decodeAUSDMintedEvent(log)
 	if event == nil {
 		logger.Error().Str("event", eventName).Uint64("block", log.BlockNumber).Msg("Failed to decode AUSD minted event")
+		metrics.RecordError("mint", "decode_error")
 		return
 	}
 
@@ -34,6 +36,7 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 	err := storage.GetEventsStore().Create(context.Background(), eventModel)
 	if err != nil {
 		logger.Error().Err(err).Str("event", eventName).Msg("Failed to create event in database")
+		metrics.RecordError("mint", "database_error")
 		return
 	}
 	logger.Debug().Uint("event_id", eventModel.ID).Msg("Event record created in database")
@@ -48,9 +51,15 @@ func ProcessAUSDMinted(eventName string, log types.Log, metricsChan chan<- model
 	err = storage.GetCoinStore().CreateMint(context.Background(), mint)
 	if err != nil {
 		logger.Error().Err(err).Str("user", event.To.Hex()).Msg("Failed to create mint record")
+		metrics.RecordError("mint", "database_error")
 		return
 	}
 	logger.Debug().Str("mint_id", mint.ID).Msg("Mint record created")
+
+	metrics.AUSDMintsTotal.Inc()
+	amountFloat := new(big.Float).SetInt(event.Amount)
+	amountFloat64, _ := amountFloat.Float64()
+	metrics.AUSDMintedAmount.Add(amountFloat64 / 1e18)
 
 	metric := model.Metrics{
 		UserAddress: event.To,
