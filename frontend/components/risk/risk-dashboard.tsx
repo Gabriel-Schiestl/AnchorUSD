@@ -152,7 +152,7 @@ export function RiskDashboard() {
                       {item.asset}
                     </span>
                     <Badge variant="outline" className="text-xs">
-                      {item.amount}
+                      {parseFloat(formatFromWei(item.amount))}
                     </Badge>
                   </div>
                   <div className="text-right">

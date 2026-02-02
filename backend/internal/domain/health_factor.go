@@ -38,11 +38,16 @@ func CalculateHealthFactorAfterDeposit(currentCollateralUSD, currentDebt, deposi
 }
 
 func AverageHealthFactor(sumHF *big.Int, totalUsers int) float64 {
-	if totalUsers == 0 {
-		return 0.0
-	}
-	avg := new(big.Int).Div(new(big.Int).Set(sumHF), big.NewInt(int64(totalUsers)))
-	return float64(avg.Int64()) / float64(constants.PRECISION.Int64())
+    if totalUsers == 0 {
+        return 0.0
+    }
+    avg := new(big.Int).Div(new(big.Int).Set(sumHF), big.NewInt(int64(totalUsers)))
+
+    bf := new(big.Float).SetInt(avg)
+    bp := new(big.Float).SetInt(constants.PRECISION)
+    res := new(big.Float).Quo(bf, bp)
+    f, _ := res.Float64()
+    return f
 }
 
 func IsAtRisk(hf *big.Int) bool {

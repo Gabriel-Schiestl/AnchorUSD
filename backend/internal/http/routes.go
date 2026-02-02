@@ -23,6 +23,12 @@ func RegisterRoutes(
 	})
 	logger.Debug().Msg("Registered /api/status route")
 
+	metrics := api.Group("/metrics")
+	{
+		metrics.GET("/dashboard", handlers.GetDashboardMetricsHandler(dashboardMetricsSvc))
+	}
+	logger.Debug().Msg("Registered /api/metrics routes")
+
 	api.GET("/user/:user", handlers.GetUserDataHandler(userDataSvc))
 	logger.Debug().Msg("Registered /api/user/:user route")
 
