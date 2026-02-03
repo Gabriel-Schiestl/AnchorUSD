@@ -1,4 +1,4 @@
-package http
+package middlewares
 
 import "github.com/gin-gonic/gin"
 

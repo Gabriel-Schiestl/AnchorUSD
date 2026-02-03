@@ -14,8 +14,8 @@ func init() {
 	logger := utils.GetLogger()
 	logger.Info().Msg("Initializing Gin HTTP server")
 	server = gin.Default()
-	server.Use(CORSMiddleware())
-	server.Use(PrometheusMiddleware())
+	server.Use(middlewares.CORSMiddleware())
+	server.Use(middlewares.PrometheusMiddleware())
 
 	limiter := rate.NewLimiter(2, 10)
 	server.Use(middlewares.RateLimitMiddleware(limiter))

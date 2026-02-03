@@ -90,6 +90,7 @@ export function useAUSDEngineOperations() {
     decimals: number = 18,
     onConfirmed?: () => Promise<void>,
   ): Promise<void> => {
+    reset();
     setOperationStep("approving");
     setCurrentOperation("Approving token...");
 
@@ -129,6 +130,7 @@ export function useAUSDEngineOperations() {
     if (!address) throw new Error("Wallet not connected");
 
     try {
+      reset();
       setCurrentOperation("Checking approval...");
 
       const hasAllowance = await checkAllowance(tokenAddress, amount, decimals);
@@ -205,6 +207,7 @@ export function useAUSDEngineOperations() {
     if (!address) throw new Error("Wallet not connected");
 
     try {
+      reset();
       setOperationStep("executing");
       setCurrentOperation("Minting AUSD...");
 
@@ -227,6 +230,7 @@ export function useAUSDEngineOperations() {
     if (!address) throw new Error("Wallet not connected");
 
     try {
+      reset();
       setCurrentOperation("Checking approval...");
 
       const hasAllowance = await checkAllowance(
@@ -265,6 +269,7 @@ export function useAUSDEngineOperations() {
     if (!address) throw new Error("Wallet not connected");
 
     try {
+      reset();
       setOperationStep("executing");
       setCurrentOperation("Redeeming collateral...");
       const amountWei = parseUnits(amount, decimals);
@@ -291,6 +296,7 @@ export function useAUSDEngineOperations() {
     if (!address) throw new Error("Wallet not connected");
 
     try {
+      reset();
       if (parseFloat(aUSDToBurn) > 0) {
         const hasAllowance = await checkAllowance(
           TOKEN_ADDRESSES.AUSD,
@@ -363,6 +369,7 @@ export function useAUSDEngineOperations() {
     if (!address) throw new Error("Wallet not connected");
 
     try {
+      reset();
       setOperationStep("executing");
       setCurrentOperation("Liquidating user...");
 

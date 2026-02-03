@@ -786,21 +786,14 @@ npm run build
 
 ### Backend
 
-- [ ] GraphQL API for flexible queries
 - [ ] WebSocket endpoint for real-time updates
-- [ ] Prometheus metrics export
-- [ ] Distributed tracing (OpenTelemetry)
-- [ ] Rate limiting and request throttling
-- [ ] Admin dashboard for monitoring
+- [x] Prometheus metrics export
+- [x] Rate limiting and request throttling
+- [x] Admin dashboard for monitoring(Grafana)
 
 ### Frontend
 
 - [ ] Advanced charts (historical prices, health factor trends)
-- [ ] Liquidation bot interface
-- [ ] Portfolio analytics
-- [ ] Mobile app (React Native)
-- [ ] Multi-language support
-- [ ] Dark mode improvements
 
 ### Infrastructure
 
